@@ -10,7 +10,7 @@ import shap
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from sktime.forecasting.model_selection import (
     ExpandingWindowSplitter,
     SlidingWindowSplitter,
@@ -41,11 +41,8 @@ class TimeSeriesRegression:
     STEP_LENGTH = 24 * 7  # 1 week
     MAX_LAGS = 3
 
-    # Define metrics for training
-    training_metrics = {"mae": mean_absolute_error, "mse": mean_squared_error}
-
     # Define metrics for Optuna objective function
-    objective_metrics = {"mae": mean_absolute_error, "mse": mean_squared_error}
+    objective_metrics = {"mae": mean_absolute_error, "mse": mean_squared_error, "mape": mean_absolute_percentage_error}
 
     # Define model mapping
     model_mapping = {
@@ -372,13 +369,12 @@ class TimeSeriesRegression:
         # shap_df.to_csv("shap_values.csv")
         # mlflow.log_artifact("shap_values.csv", artifact_name)
 
-    def _walk_forward_forecasting(
+    def _forecast(
         self,
         df: pd.DataFrame,
         target_variable: str,
         model_name: str,
         metric_name: str,
-        param_grid: dict,
         step: int,
         cv_strategy: str = "rolling",
     ) -> pd.DataFrame:
@@ -392,11 +388,13 @@ class TimeSeriesRegression:
         target_variable : str
             Name of the target variable in df.
         model_name : str
-            Name of the regression model to use. Must be one of: 'ar', 'rf', 'lr', 'gbr'.
-        param_grid : dict
-            Parameter grid for the specified model.
+            Name of the regression model to use. Must be one of: "rr", "rf", "xgb"
+        metric_name : str
+            Name of the metric to use for optimization. Must be one of: "mae", "rmse", "rmsle"
         step : int
             Number of steps to forecast. This determines the forecast horizon for each iteration in the walk-forward validation.
+        cv_strategy : str
+            Cross-validation strategy. Must be one of: "rolling", "expanding".
 
         Returns
         -------
@@ -560,8 +558,6 @@ class TimeSeriesRegression:
         steps : int
             Number of steps to simulate in the production environment. This determines how many iterations the simulation will run.
         """
-        param_grid = {"fit_intercept": True}  # , 'normalize': False}
-
         if self.y_data is None:
             raise ValueError(
                 "y_data and must be specified before calling simulate_production()."
@@ -583,11 +579,11 @@ class TimeSeriesRegression:
                 how="inner",
             )
 
-            df_results = self._walk_forward_forecasting(
-                df,
+            df_results = self._forecast(
+                df=df,
                 target_variable=list(self.y_data)[0],
-                model_name="lr",
-                param_grid=param_grid,
+                model_name="rr",
+                metric_name="mae",
                 step=self.STEP_LENGTH,
                 cv_strategy=cv_strategy,
             )
