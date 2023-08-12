@@ -1,0 +1,135 @@
+[tool.poetry]
+name = "load_forecasting"
+version = "0.0.1"
+description = "Submission for take-home assignment"
+authors = ["Sankalp <sankalp.gilda@gmail.com>"]
+readme = "README.md"
+packages = [{include = "*.py"}]
+
+[tool.poetry.dependencies]
+python = "~3.10"
+matplotlib = "~3.5"
+pandas = "~2.0"
+scikit_learn = "~1.3"
+seaborn = "~0.12"
+sktime = "~0.21"
+statsmodels = "~0.14"
+llvmlite = "~0.40"
+shap = "~0.42"
+xgboost = "~1.7"
+optuna = "~3.0"
+
+[tool.poetry.dev-dependencies]
+# Add your dev dependencies here, e.g.
+black = "~23.7"
+ruff = "~0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.black]
+line-length = 79
+target-version = ["py38", "py39", "py310", "py311"]
+
+[tool.ruff]
+target-version = 'py38'
+select = [
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "D",  # pydocstyle
+    "E",  # Error
+    "F",  # pyflakes
+    "I",  # isort
+    "ISC", # flake8-implicit-str-concat
+    "N",  # pep8-naming
+    "PGH",  # pygrep-hooks
+    "PTH", # flake8-use-pathlib
+    "Q",  # flake8-quotes
+    "S",  # bandit
+    "SIM",  # flake8-simplify
+    "TRY",  # tryceratops
+    "UP",  # pyupgrade
+    "W",  # pycodestyle warnings
+    "YTT", # flake8-2020
+]
+
+exclude = [
+    "migrations",
+    "__pycache__",
+    "manage.py",
+    "settings.py",
+    "env",
+    ".env",
+    "venv",
+    ".venv",
+]
+
+ignore = [
+    "B905",  # zip strict=true; remove once python <3.10 support is dropped.
+    "C901",  # function is too complex; overly strict
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "D200",
+    "D401",
+    "E402",
+    "E501",  # line length handled by black
+    "F401",
+    "N802",  # Function name should be lowercase; overly strict
+    "N803",  # Argument name should be lowercase; overly strict
+    "N806",  # Variable in function should be lowercase; overly strict
+    "N816",  # Variable in class scope should not be mixedCase; overly strict
+    "PGH003",  # Use of "eval"; overly strict
+    "SIM115",  # open-file-with-context-handler; overly strict
+    "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
+]
+
+line-length = 79  # Must agree with Black
+
+[tool.ruff.isort]
+order-by-type = true
+relative-imports-order = "closest-to-furthest"
+extra-standard-library = ["typing"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+known-first-party = []
+
+
+[tool.ruff.flake8-bugbear]
+extend-immutable-calls = [
+    "chr",
+    "typer.Argument",
+    "typer.Option",
+]
+
+[tool.ruff.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.per-file-ignores]
+"tests/*.py" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "S101",  # use of "assert"
+    "S102",  # use of "exec"
+    "S106",  # possible hardcoded password.
+    "PGH001",  # use of "eval"
+]
+
+[tool.ruff.pep8-naming]
+staticmethod-decorators = [
+    "pydantic.validator",
+    "pydantic.root_validator",
+]
