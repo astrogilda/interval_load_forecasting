@@ -48,8 +48,13 @@ class TimeSeriesForecaster:
 
     WINDOW_LENGTH = 24 * 30 * 3  # 3 months
     INITIAL_WINDOW = 24 * 30 * 3  # 3 months
-    MAX_LAGS = 3
     OPTUNA_TRIALS = 100
+    AR_FROM_Y = True  # Autoregressive features from y
+    AR_FROM_WEATHER_DATA = False  # Autoregressive features from weather data
+    LAGS = 3  # Number of lags to use for autoregressive features
+    MAX_LAGS = 3  # Maximum number of lags to use for autoregressive features
+    HPO_FLAG = False  # Flag to enable hyperparameter optimization
+    CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
 
     # Define metrics for Optuna objective function
     objective_metrics = {
@@ -100,7 +105,14 @@ class TimeSeriesForecaster:
                 "y_data and must be specified before calling simulate_production()."
             )
 
-    def objective(self, trial, X_train: np.ndarray, y_train:np.ndarray, model_name:str, metric_name:str) -> float:
+    def objective(
+        self,
+        trial,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        model_name: str,
+        metric_name: str,
+    ) -> float:
         """
         Objective function for Optuna optimization.
 
@@ -246,8 +258,8 @@ class TimeSeriesForecaster:
         model_name: str,
         metric_name: str,
         step: int,
-        cv_strategy: str = "rolling",
-        hpo_flag: bool = False,
+        cv_strategy: str = CV_STRATEGY,
+        hpo_flag: bool = HPO_FLAG,
     ) -> pd.DataFrame:
         """
         Perform walk forward forecasting using a specified regression model and parameter grid.
@@ -303,25 +315,23 @@ class TimeSeriesForecaster:
                 "metric_name": metric_name,
             }
         )
+
+        def featurizer(x):
+            return TimeSeriesFeaturizer.create_features(
+                x,
+                target_variable,
+                ar_from_y=self.AR_FROM_Y,
+                ar_from_weather_data=self.AR_FROM_WEATHER_DATA,
+                lags=step_length or self.LAGS,
+                max_lags=step_length or self.MAX_LAGS,
+            )
+
         for train_index, test_index in cv.split(df):
             train, test = df.iloc[train_index], df.iloc[test_index]
             print(train.shape, test.shape)
-            train, _ = TimeSeriesFeaturizer.create_features(
-                train,
-                target_variable,
-                ar_from_y=True,
-                ar_from_weather_data=False,
-                lags=step_length,
-                max_lags=step_length,
-            )
-            test, _ = TimeSeriesFeaturizer.create_features(
-                test,
-                target_variable,
-                ar_from_y=True,
-                ar_from_weather_data=False,
-                lags=step_length,
-                max_lags=step_length,
-            )
+
+            train, _ = featurizer(train)
+            test, _ = featurizer(test)
 
             X_train, y_train = self.create_regression_data(
                 train, target_variable, step

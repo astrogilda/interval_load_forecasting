@@ -9,7 +9,7 @@ figures/
 results/
 EDA.py
 DS_Forecasting_Take_Home_2023.ipynb
-timeseriesanalysis*
-timeseriesmodel*
-timeseriesregression*
+timeseriesanalysis.py
+timeseriesmodel.py
+timeseriesregression.py
 
