@@ -10,7 +10,11 @@ import shap
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
-from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+)
 from sktime.forecasting.model_selection import (
     ExpandingWindowSplitter,
     SlidingWindowSplitter,
@@ -42,7 +46,11 @@ class TimeSeriesRegression:
     MAX_LAGS = 3
 
     # Define metrics for Optuna objective function
-    objective_metrics = {"mae": mean_absolute_error, "mse": mean_squared_error, "mape": mean_absolute_percentage_error}
+    objective_metrics = {
+        "mae": mean_absolute_error,
+        "mse": mean_squared_error,
+        "mape": mean_absolute_percentage_error,
+    }
 
     # Define model mapping
     model_mapping = {
@@ -571,13 +579,16 @@ class TimeSeriesRegression:
 
         for i in range(initial_size, initial_size + steps):
             # Merge y_data and weather_data
-            df = pd.merge(
-                self.y_data.iloc[: i + 1],
-                self.weather_data.iloc[: i + 1],
-                left_index=True,
-                right_index=True,
-                how="inner",
-            )
+            if self.weather_data is None:
+                df = self.y_data.iloc[: i + 1]
+            else:
+                df = pd.merge(
+                    self.y_data.iloc[: i + 1],
+                    self.weather_data.iloc[: i + 1],
+                    left_index=True,
+                    right_index=True,
+                    how="inner",
+                )
 
             df_results = self._forecast(
                 df=df,
