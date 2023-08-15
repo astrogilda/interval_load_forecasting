@@ -1,9 +1,8 @@
-from timeseriesanalysis import TimeSeriesAnalysis
-from timeserieseda import TimeSeriesEDA
-from timeseriesfeaturizer import TimeSeriesFeaturizer
-from timeseriesloader import TimeSeriesLoader
-from timeseriesmodel import TimeSeriesModel
-from timeseriespreprocessor import TimeSeriesPreprocessor
+from time_series_eda import TimeSeriesEDA
+from time_series_featurizer import TimeSeriesFeaturizer
+from time_series_forecaster import TimeSeriesForecaster
+from time_series_loader import TimeSeriesLoader
+from time_series_preprocessor import TimeSeriesPreprocessor
 
 # Load data
 data_loader = TimeSeriesLoader(y_file="data/load.csv")
@@ -11,14 +10,20 @@ y_data, weather_data = data_loader.y_data, data_loader.weather_data
 
 # Perform EDA
 eda = TimeSeriesEDA()
-eda.perform_eda(y_data, target_variable="Load", freq=24, lags=40)
+eda.perform_eda(y_data, target_variable="Load", freq=24, lags=40)  # type: ignore
 
 # Preprocess data
-preprocessor = TimeSeriesPreprocessor(y_data, weather_data)
+preprocessor = TimeSeriesPreprocessor(y_data, weather_data)  # type: ignore
 y_data, weather_data = preprocessor.align_timestamps()
+
 # Prepare data
 featurizer = TimeSeriesFeaturizer()
-df = featurizer.create_regression_data(y_data, weather_data)
+df = featurizer.create_regression_data(
+    y_data, "Load", use_pacf=True, max_lags=96 * 7
+)
+
+# Train model
+forecaster = TimeSeriesForecaster(y_data, weather_data)
 
 """
 # Preprocess data

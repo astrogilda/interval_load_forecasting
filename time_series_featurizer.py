@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -85,24 +85,24 @@ class TimeSeriesFeaturizer:
         return best_lag
 
     @staticmethod
-    def create_regression_data(
-        y: pd.DataFrame,
-        weather_data: Optional[pd.DataFrame] = None,
+    def create_features(
+        df: pd.DataFrame,
+        target_variable: str,
         ar_from_y: bool = True,
         ar_from_weather_data: bool = False,
         lags: int = 3,
         max_lags: int = 3,
         use_pacf: bool = False,
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, Dict[str, int]]:
         """
         Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
 
         Parameters
         ----------
-        y : pd.DataFrame
-            Time series data.
-        weather_data : pd.DataFrame, optional
-            Exogenous weather data.
+        df: pd.DataFrame
+            DataFrame with a DateTime index, containing both y and optional weather data.
+        target_variable: str
+            Name of the target (y) variable.
         ar_from_y : bool
             If True, add autoregressive features from y.
         ar_from_weather_data : bool
@@ -123,46 +123,45 @@ class TimeSeriesFeaturizer:
                 f"lags cannot be greater than max_lags ({max_lags})"
             )
 
-        if y.empty:
-            raise ValueError("Time series data cannot be empty.")
-
-        # Merge y with weather data
-        if weather_data is None:
-            df = y.copy()
-        else:
-            df = pd.merge(
-                y,
-                weather_data,
-                left_index=True,
-                right_index=True,
-                how="inner",
+        # Ensure that target_variable is in df
+        if target_variable not in df.columns:
+            raise ValueError(
+                f"target_variable ({target_variable}) not in df.columns"
             )
+
+        # Ensure that the index is a DateTimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index must be a DateTimeIndex")
 
         # Create calendar features
         df = TimeSeriesFeaturizer.create_calendar_features(df)
 
+        best_lags = {}
         # If autoregressive features from y are requested, add them
-        y_name = y.columns[0]
+        y = df[target_variable]
         if ar_from_y:
             if use_pacf:
                 best_lag_y = TimeSeriesFeaturizer.find_best_lag_pacf(
                     y, max_lags
                 )
+                best_lags[target_variable] = best_lag_y
             else:
                 best_lag_y = lags
             for i in range(1, best_lag_y + 1):
-                df[f"y_lag_{i}"] = df[y_name].shift(i)
+                df[f"y_lag_{i}"] = y.shift(i)
 
         # If autoregressive features from weather_data are requested, add them
+        weather_data = df.drop(columns=target_variable)
         if weather_data is not None and ar_from_weather_data:
             for column in weather_data.columns:
                 if use_pacf:
                     best_lag_column = TimeSeriesFeaturizer.find_best_lag_pacf(
                         df[column], max_lags
                     )
+                    best_lags[column] = best_lag_column
                 else:
                     best_lag_column = lags
                 for i in range(1, best_lag_column + 1):
                     df[f"{column}_lag_{i}"] = df[column].shift(i)
 
-        return df.dropna()
+        return df.dropna(), best_lags

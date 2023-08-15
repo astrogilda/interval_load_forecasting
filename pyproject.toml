@@ -18,6 +18,7 @@ llvmlite = "~0.40"
 shap = "~0.42"
 xgboost = "~1.7"
 optuna = "~3.0"
+mlflow = "^2.6.0"
 
 [tool.poetry.dev-dependencies]
 # Add your dev dependencies here, e.g.

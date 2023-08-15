@@ -82,24 +82,24 @@ class TimeSeriesPreprocessor:
         df1_aligned, df2_aligned : tuple of pd.DataFrame
             Aligned dataframes.
         """
-        self.y_data.sort_index(inplace=True)
+        # Sort indices
+        self.y_data.sort_index(inplace=True)  # type: ignore
+        # Handle duplicate indices
         self.y_data = TimeSeriesPreprocessor._handle_duplicate_indices(
-            self.y_data
+            self.y_data  # type: ignore
         )
         if self.weather_data is None:
-            return self.y_data, None
+            return self.y_data, None  # type: ignore
         else:
-            self.weather_data.sort_index(inplace=True)
-            self.weather_data = (
-                TimeSeriesPreprocessor._handle_duplicate_indices(
-                    self.weather_data
-                )
+            self.weather_data.sort_index(inplace=True)  # type: ignore
+            self.weather_data = TimeSeriesPreprocessor._handle_duplicate_indices(
+                self.weather_data  # type: ignore
             )
             common_index = self.y_data.index.intersection(
-                self.weather_data.index
+                self.weather_data.index  # type: ignore
             )
-            self.y_data = self.y_data.reindex(common_index, method="ffill")
-            self.weather_data = self.weather_data.reindex(
+            self.y_data = self.y_data.reindex(common_index, method="ffill")  # type: ignore
+            self.weather_data = self.weather_data.reindex(  # type: ignore
                 common_index, method="ffill"
             )
             return self.y_data, self.weather_data
