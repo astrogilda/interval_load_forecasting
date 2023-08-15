@@ -33,21 +33,15 @@ class TimeSeriesModel:
     }
 
     model_spaces = {
-        "rr": {"alpha": optuna.distributions.UniformDistribution(0.0, 1.0)},
+        "rr": {"alpha": optuna.distributions.FloatDistribution(0.0, 1.0)},
         "rf": {
-            "n_estimators": optuna.distributions.IntUniformDistribution(
-                2, 150
-            ),
-            "max_depth": optuna.distributions.IntUniformDistribution(1, 32),
+            "n_estimators": optuna.distributions.IntDistribution(2, 150),
+            "max_depth": optuna.distributions.IntDistribution(1, 32),
         },
         "xgb": {
-            "n_estimators": optuna.distributions.IntUniformDistribution(
-                2, 150
-            ),
-            "max_depth": optuna.distributions.IntUniformDistribution(1, 10),
-            "learning_rate": optuna.distributions.UniformDistribution(
-                0.01, 0.3
-            ),
+            "n_estimators": optuna.distributions.IntDistribution(2, 150),
+            "max_depth": optuna.distributions.IntDistribution(1, 10),
+            "learning_rate": optuna.distributions.FloatDistribution(0.01, 0.3),
         },
     }
 

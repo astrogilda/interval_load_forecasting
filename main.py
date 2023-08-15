@@ -1,7 +1,9 @@
 from timeseriesanalysis import TimeSeriesAnalysis
 from timeserieseda import TimeSeriesEDA
+from timeseriesfeaturizer import TimeSeriesFeaturizer
 from timeseriesloader import TimeSeriesLoader
 from timeseriesmodel import TimeSeriesModel
+from timeseriespreprocessor import TimeSeriesPreprocessor
 
 # Load data
 data_loader = TimeSeriesLoader(y_file="data/load.csv")
@@ -11,6 +13,12 @@ y_data, weather_data = data_loader.y_data, data_loader.weather_data
 eda = TimeSeriesEDA()
 eda.perform_eda(y_data, target_variable="Load", freq=24, lags=40)
 
+# Preprocess data
+preprocessor = TimeSeriesPreprocessor(y_data, weather_data)
+y_data, weather_data = preprocessor.align_timestamps()
+# Prepare data
+featurizer = TimeSeriesFeaturizer()
+df = featurizer.create_regression_data(y_data, weather_data)
 
 """
 # Preprocess data

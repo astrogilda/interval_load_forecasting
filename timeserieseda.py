@@ -1,14 +1,38 @@
-from typing import Optional
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from pandas.plotting import autocorrelation_plot
 from statsmodels.graphics.tsaplots import plot_pacf
-from statsmodels.tsa.seasonal import STL
+from statsmodels.tsa.seasonal import MSTL
 
 # Default figure size for plots
-FIGSIZE = (16, 8)
+# FIGSIZE = (16, 8)
+
+# Define the settings for high-quality plots
+plot_settings = {
+    "figure.figsize": (14, 8),  # Figure size
+    "font.size": 12,  # Font size
+    "font.family": "serif",  # Font family
+    "lines.linewidth": 3,  # Line width
+    "axes.labelsize": 16,  # Label size
+    "axes.titlesize": 18,  # Title size
+    "xtick.labelsize": 14,  # X-tick label size
+    "ytick.labelsize": 14,  # Y-tick label size
+    "legend.fontsize": 14,  # Legend font size
+    "axes.grid": True,  # Show grid
+    "savefig.dpi": 300,  # DPI for saving figures
+    "savefig.format": "png",  # Format for saving figures
+    "savefig.bbox": "tight",  # Bounding box for saving figures
+    "savefig.pad_inches": 0.1,  # Padding for saving figures
+}
+
+
+plt.style.use("dark_background")
+
+# Apply the settings globally
+plt.rcParams.update(plot_settings)
 
 
 class TimeSeriesEDA:
@@ -21,7 +45,7 @@ class TimeSeriesEDA:
         y : pd.Series
             Time series data.
         """
-        plt.figure(figsize=FIGSIZE)
+        plt.figure()  # figsize=FIGSIZE)
         plt.plot(y)
         plt.title("Time Series Plot")
         plt.xlabel("Time")
@@ -31,7 +55,7 @@ class TimeSeriesEDA:
     def plot_seasonal_decomposition(
         self,
         y: pd.Series,
-        seasonal: Optional[int] = None,
+        seasonalities: Optional[List[int]] = None,
     ) -> None:
         """
         Plots the seasonal decomposition of the time series data using STL.
@@ -40,13 +64,19 @@ class TimeSeriesEDA:
         ----------
         y : pd.Series
             Time series data.
-        seasonal : int, optional
-            Frequency of the seasonality. Default is None.
+        seasonalities : Union[int, List[int]], optional
+            Seasonalities to consider for decomposition. Default is [96, 96*7, 96*30].
         """
-        stl = STL(y) if seasonal is None else STL(y, seasonal=seasonal)
-        result = stl.fit()
+        if seasonalities is None:
+            seasonalities = [
+                96,
+                96 * 7,
+                96 * 30,
+            ]  # 96 15-minute intervals in a day, 96*7 in a week
+        mstl = MSTL(y, periods=seasonalities)
+        result = mstl.fit()
+        plt.close("all")
         result.plot()
-        plt.show()
 
     def plot_acf_pacf(self, y: pd.Series, lags: int) -> None:
         """
@@ -59,7 +89,7 @@ class TimeSeriesEDA:
         lags : int
             Number of lags to consider.
         """
-        plt.figure(figsize=FIGSIZE)
+        plt.figure()
         plt.subplot(211)
         autocorrelation_plot(y)
         plt.title("Autocorrelation Function (ACF)")
@@ -78,8 +108,8 @@ class TimeSeriesEDA:
         y : pd.Series
             Time series data.
         """
-        plt.figure(figsize=FIGSIZE)
-        sns.histplot(y, kde=True)
+        plt.figure()
+        sns.histplot(y, kde=True, edgecolor="black")
         plt.title("Distribution Plot")
         plt.xlabel("Value")
         plt.ylabel("Frequency")
@@ -106,7 +136,7 @@ class TimeSeriesEDA:
         title : str
             The title of the plot.
         """
-        plt.figure(figsize=FIGSIZE)
+        plt.figure()
         sns.boxplot(data=df, x=x_variable, y=target_variable)
         plt.title(title)
         plt.show()
@@ -133,8 +163,15 @@ class TimeSeriesEDA:
             The title of the heatmap.
         """
         load_data = df.groupby(groupby_vars)[target_variable].mean().unstack()
-        plt.figure(figsize=FIGSIZE)
-        sns.heatmap(load_data, cmap="coolwarm")
+        plt.figure()
+        sns.heatmap(
+            load_data,
+            cmap="coolwarm",
+            annot=True,
+            fmt=".0f",
+            linewidths=1,
+            linecolor="black",
+        )
         plt.title(title)
         plt.show()
 
@@ -173,7 +210,7 @@ class TimeSeriesEDA:
         # Call the plotting methods
         y = df[target_variable]
         self.plot_time_series(y)
-        #self.plot_seasonal_decomposition(y, freq)
+        # self.plot_seasonal_decomposition(y, freq)
         self.plot_acf_pacf(y, lags)
         self.plot_distribution(y)
         self.plot_patterns(df, target_variable, "hour", "Hourly Load Patterns")

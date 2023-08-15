@@ -29,12 +29,14 @@ class TimeSeriesLoader:
         weather_data_file : str
             Path of the CSV file containing weather data.
         """
-        self.y_data, self.weather_data = self._load_data(
+        self.y_data, self.weather_data = self.load_data(
             y_file, col_name="Load"
-        ), self._load_data(weather_data_file)
+        ), self.load_data(weather_data_file)
 
     @staticmethod
-    def _load_data(file_name: Optional[str], col_name: Optional[str] = None) -> Optional[pd.DataFrame]:
+    def load_data(
+        file_name: Optional[str], col_name: Optional[str] = None
+    ) -> Optional[pd.DataFrame]:
         """
         Load data from CSV files and perform sanity checks.
 
@@ -62,6 +64,14 @@ class TimeSeriesLoader:
         data.index.rename("DateTime", inplace=True)
         # Convert the index to datetime type
         data.index = pd.to_datetime(data.index)
+
+        # Compute the differences between consecutive timestamps
+        deltas = data.index.to_series().diff().value_counts().index
+        # Take the most common difference as the inferred frequency
+        inferred_freq = deltas[0] if len(deltas) > 0 else None
+        # Create a new index with the inferred frequency
+        if inferred_freq:
+            data = data.asfreq(inferred_freq)
 
         # Check if data is a pd.DataFrame
         if not isinstance(data, pd.DataFrame):
