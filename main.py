@@ -1,3 +1,9 @@
+import numpy as np
+from sktime.forecasting.model_selection import (
+    ExpandingWindowSplitter,
+    SlidingWindowSplitter,
+)
+
 from time_series_eda import TimeSeriesEDA
 from time_series_featurizer import TimeSeriesFeaturizer
 from time_series_forecaster import TimeSeriesForecaster
@@ -9,8 +15,8 @@ data_loader = TimeSeriesLoader(y_file="data/load.csv")
 y_data, weather_data = data_loader.y_data, data_loader.weather_data
 
 # Perform EDA
-eda = TimeSeriesEDA()
-eda.perform_eda(y_data, target_variable="Load", freq=24, lags=40)  # type: ignore
+# eda = TimeSeriesEDA()
+# eda.perform_eda(y_data, target_variable="Load", freq=24, lags=40)  # type: ignore
 
 # Preprocess data
 preprocessor = TimeSeriesPreprocessor(y_data, weather_data)  # type: ignore
@@ -18,12 +24,28 @@ y_data, weather_data = preprocessor.align_timestamps()
 
 # Prepare data
 featurizer = TimeSeriesFeaturizer()
-df = featurizer.create_regression_data(
-    y_data, "Load", use_pacf=True, max_lags=96 * 7
+df, max_lags = featurizer.create_features(
+    y_data, "Load", use_pacf=False, max_lags=96 * 7, lags=96
 )
 
 # Train model
 forecaster = TimeSeriesForecaster(y_data, weather_data)
+q = forecaster.forecast(
+    df=df, target_variable="Load", model_name="rr", metric_name="mae", step=96
+)
+
+
+cv = SlidingWindowSplitter(
+    window_length=96 * 30 * 3,
+    start_with_window=True,
+    step_length=96,
+    fh=np.arange(1, 97),
+)
+
+for train_index, test_index in cv.split(df):
+    print(f"TRAIN: {train_index}")
+    print(f"TEST: {test_index}")
+    print("")
 
 """
 # Preprocess data

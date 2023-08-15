@@ -44,7 +44,6 @@ class TimeSeriesFeaturizer:
             raise TypeError("Index must be a DateTimeIndex")
 
         # Extract calendar features from the index
-        df["year"] = df.index.year
         df["month"] = (
             (df.index.month + 1) / 12 if normalize else df.index.month
         )
@@ -52,8 +51,10 @@ class TimeSeriesFeaturizer:
         df["dayofweek"] = (
             (df.index.dayofweek + 1) / 7 if normalize else df.index.dayofweek
         )
-        df["hour"] = (df.index.hour + 1) / 24 if normalize else df.index.hour
-        df["minute"] = (
+        df["hourofday"] = (
+            (df.index.hour + 1) / 24 if normalize else df.index.hour
+        )
+        df["minuteofhour"] = (
             (df.index.minute + 1) / 60 if normalize else df.index.minute
         )
 
@@ -137,6 +138,8 @@ class TimeSeriesFeaturizer:
         df = TimeSeriesFeaturizer.create_calendar_features(df)
 
         best_lags = {}
+        # Create a dictionary to hold the new columns
+        new_columns = {}
         # If autoregressive features from y are requested, add them
         y = df[target_variable]
         if ar_from_y:
@@ -147,8 +150,9 @@ class TimeSeriesFeaturizer:
                 best_lags[target_variable] = best_lag_y
             else:
                 best_lag_y = lags
+
             for i in range(1, best_lag_y + 1):
-                df[f"y_lag_{i}"] = y.shift(i)
+                new_columns[f"y_lag_{i}"] = y.shift(i)
 
         # If autoregressive features from weather_data are requested, add them
         weather_data = df.drop(columns=target_variable)
@@ -162,6 +166,9 @@ class TimeSeriesFeaturizer:
                 else:
                     best_lag_column = lags
                 for i in range(1, best_lag_column + 1):
-                    df[f"{column}_lag_{i}"] = df[column].shift(i)
+                    new_columns[f"{column}_lag_{i}"] = df[column].shift(i)
+
+        # Concatenate the new columns to the original DataFrame
+        df = pd.concat([df, pd.DataFrame(new_columns)], axis=1)
 
         return df.dropna(), best_lags

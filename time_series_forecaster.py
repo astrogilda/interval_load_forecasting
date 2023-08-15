@@ -6,6 +6,7 @@ import optuna
 import pandas as pd
 import shap
 from matplotlib import pyplot as plt
+from pytz import HOUR
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import (
@@ -21,6 +22,12 @@ from sktime.forecasting.model_selection._split import BaseWindowSplitter
 from sktime.utils.plotting import plot_series
 from xgboost import XGBRegressor
 
+from time_constants import (
+    DAYS_PER_MONTH,
+    DAYS_PER_WEEK,
+    FIFTEEN_MINUTES_PER_HOUR,
+    HOURS_PER_DAY,
+)
 from time_series_featurizer import TimeSeriesFeaturizer
 
 
@@ -32,7 +39,7 @@ class TimeSeriesForecaster:
     ----------
     WINDOW_LENGTH : int
         Length of the sliding window for rolling cross-validation.
-    INITIAL_WINDOW : int
+    INITIAL_WINDOW_LENGTH : int
         Length of the initial window for expanding cross-validation.
     MAX_LAGS : int
         Maximum number of lags to use for autoregressive features.
@@ -46,13 +53,30 @@ class TimeSeriesForecaster:
         Model names to model classes mapping.
     """
 
-    WINDOW_LENGTH = 24 * 30 * 3  # 3 months
-    INITIAL_WINDOW = 24 * 30 * 3  # 3 months
+    WINDOW_LENGTH = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH * 3
+    )  # 3 months
+    INITIAL_WINDOW_LENGTH = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * HOURS_PER_DAY * 3
+    )  # 3 months
+    STEP_LENGTH = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
+    )  # 1 month
+    VAL_LENGTH = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
+    )  # 1 month
     OPTUNA_TRIALS = 100
     AR_FROM_Y = True  # Autoregressive features from y
     AR_FROM_WEATHER_DATA = False  # Autoregressive features from weather data
-    LAGS = 3  # Number of lags to use for autoregressive features
-    MAX_LAGS = 3  # Maximum number of lags to use for autoregressive features
+    LAGS = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
+    )  # Number of lags to use for autoregressive features; 1 week
+    MAX_LAGS = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
+    )  # Maximum number of lags to use for autoregressive features; 1 week
+    FORECAST_HORIZON = (
+        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
+    )  # Number of steps to forecast; 1 day
     HPO_FLAG = False  # Flag to enable hyperparameter optimization
     CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
 
@@ -105,7 +129,7 @@ class TimeSeriesForecaster:
                 "y_data and must be specified before calling simulate_production()."
             )
 
-    def objective(
+    def _objective(
         self,
         trial,
         X_train: np.ndarray,
@@ -161,7 +185,7 @@ class TimeSeriesForecaster:
         # Return the metric
         return metric_func(y_train, model.predict(X_train))
 
-    def log_shap_values(self, model, X_train, artifact_name):
+    def _log_shap_values(self, model, X_train, artifact_name):
         # Calculate SHAP values
         explainer = shap.Explainer(model, X_train)
         shap_values = explainer(X_train)
@@ -176,7 +200,7 @@ class TimeSeriesForecaster:
         shap_df.to_csv("shap_values.csv")
         mlflow.log_artifact("shap_values.csv", artifact_name)
 
-    def create_cross_validator(
+    def _create_cross_validator(
         self,
         cv_strategy: str,
         step_length: int,
@@ -208,7 +232,7 @@ class TimeSeriesForecaster:
             )
         elif cv_strategy == "expanding":
             cv = ExpandingWindowSplitter(
-                initial_window=self.INITIAL_WINDOW,
+                initial_window=self.INITIAL_WINDOW_LENGTH,
                 step_length=step_length,
                 fh=fh,
             )
@@ -218,7 +242,7 @@ class TimeSeriesForecaster:
             )
         return cv
 
-    def create_regression_data(
+    def _create_regression_data(
         self, df: pd.DataFrame, target_variable: str, fh: int
     ) -> Tuple[pd.DataFrame, Union[pd.DataFrame, pd.Series]]:
         """
@@ -301,7 +325,7 @@ class TimeSeriesForecaster:
         fh = np.arange(1, step + 1)
 
         # Initialize cross-validator
-        cv = self.create_cross_validator(cv_strategy, step_length, fh)
+        cv = self._create_cross_validator(cv_strategy, step_length, fh)
 
         y_true_all, y_pred_all, indices_all = [], [], []
 
@@ -332,11 +356,15 @@ class TimeSeriesForecaster:
 
             train, _ = featurizer(train)
             test, _ = featurizer(test)
+            print("Featurization done\n")
+            print(f"Train shape: {train.shape}, Test shape: {test.shape}")
+            print(f"Train: {train.head()}")
+            print(f"Test: {test.head()}")
 
-            X_train, y_train = self.create_regression_data(
+            X_train, y_train = self._create_regression_data(
                 train, target_variable, step
             )
-            X_test, y_test = self.create_regression_data(
+            X_test, y_test = self._create_regression_data(
                 test, target_variable, step
             )
 
@@ -347,7 +375,7 @@ class TimeSeriesForecaster:
             if hpo_flag:
                 study = optuna.create_study(direction="minimize")
                 study.optimize(
-                    lambda trial, X_train=X_train, y_train=y_train: self.objective(
+                    lambda trial, X_train=X_train, y_train=y_train: self._objective(
                         trial,
                         X_train,
                         y_train,
@@ -377,7 +405,7 @@ class TimeSeriesForecaster:
             mlflow.log_metric("mae", mae)
 
             # Log SHAP values
-            self.log_shap_values(model, X_train, f"shap_{model_name}")
+            self._log_shap_values(model, X_train, f"shap_{model_name}")
 
             y_true_all.extend(list(y_test))
             y_pred_all.extend(list(y_pred))
