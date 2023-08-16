@@ -3,6 +3,8 @@ from typing import Optional
 
 import pandas as pd
 
+from common_constants import TARGET_VARIABLE, WEATHER_DATA_FILE, Y_FILE
+
 
 class TimeSeriesLoader:
     """
@@ -17,7 +19,9 @@ class TimeSeriesLoader:
     """
 
     def __init__(
-        self, y_file: str, weather_data_file: Optional[str] = None
+        self,
+        y_file: str = Y_FILE,
+        weather_data_file: Optional[str] = WEATHER_DATA_FILE,
     ) -> None:
         """
         Constructs all the necessary attributes for the TimeSeriesLoader object.
@@ -30,7 +34,7 @@ class TimeSeriesLoader:
             Path of the CSV file containing weather data.
         """
         self.y_data, self.weather_data = self.load_data(
-            y_file, col_name="Load"
+            y_file, col_name=TARGET_VARIABLE
         ), self.load_data(weather_data_file)
 
     @staticmethod
@@ -76,9 +80,6 @@ class TimeSeriesLoader:
         # Check if data is a pd.DataFrame
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
-
-        # Check for missing values and forward fill
-        data = data.fillna(method="ffill")
 
         # If a column name is specified, and if the dataframe has only one column, rename the column
         if col_name is not None and len(data.columns) == 1:

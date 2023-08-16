@@ -5,6 +5,11 @@ from time_constants import (
     HOURS_PER_DAY,
 )
 
+# For loading data
+Y_FILE = "data/load.csv"  # Path of the CSV file containing y data
+WEATHER_DATA_FILE = None  # Path of the CSV file containing weather data
+TARGET_VARIABLE = "Load"  # Target variable name
+
 # For creating features
 AR_FROM_Y = True  # Autoregressive features from y
 AR_FROM_WEATHER_DATA = False  # Autoregressive features from weather data

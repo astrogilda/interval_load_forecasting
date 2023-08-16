@@ -17,7 +17,9 @@ class TimeSeriesPreprocessor:
     """
 
     def __init__(
-        self, y_data: pd.DataFrame, weather_data: Optional[pd.DataFrame] = None
+        self,
+        y_data: Union[pd.DataFrame, pd.Series],
+        weather_data: Optional[pd.DataFrame] = None,
     ) -> None:
         """
         Constructs all the necessary attributes for the TimeSeriesPreprocessor object.
@@ -32,9 +34,25 @@ class TimeSeriesPreprocessor:
         self.y_data = y_data
         self.weather_data = weather_data
 
+        # Check if y_data is a pandas DataFrame or Series
+        if not isinstance(self.y_data, (pd.DataFrame, pd.Series)):
+            raise TypeError(
+                "Input y_data must be a pandas DataFrame or Series"
+            )
+
+        # Check if weather_data is a pandas DataFrame or Series
+        if (
+            not isinstance(self.weather_data, pd.DataFrame)
+            and self.weather_data is not None
+        ):
+            raise TypeError(
+                "Input weather_data must be a pandas DataFrame or None"
+            )
+
     @staticmethod
     def _handle_missing_indices(
-        *dfs: Union[pd.DataFrame, pd.Series], freq: Optional[str] = None
+        *dfs: Optional[Union[pd.DataFrame, pd.Series]],
+        freq: Optional[str] = None,
     ) -> Union[
         Union[pd.DataFrame, pd.Series], Tuple[Union[pd.DataFrame, pd.Series]]
     ]:
@@ -56,6 +74,10 @@ class TimeSeriesPreprocessor:
         """
         output_dfs = []
         for df in dfs:
+            if df is None:
+                output_dfs.append(None)
+                continue
+
             # Check if df is a pandas DataFrame or Series
             if not isinstance(df, (pd.DataFrame, pd.Series)):
                 raise TypeError(
@@ -98,7 +120,7 @@ class TimeSeriesPreprocessor:
 
     @staticmethod
     def _handle_duplicate_indices(
-        *dfs: Union[pd.DataFrame, pd.Series]
+        *dfs: Optional[Union[pd.DataFrame, pd.Series]]
     ) -> Union[
         Union[pd.DataFrame, pd.Series], Tuple[Union[pd.DataFrame, pd.Series]]
     ]:
@@ -118,6 +140,10 @@ class TimeSeriesPreprocessor:
         """
         output_dfs = []
         for df in dfs:
+            if df is None:
+                output_dfs.append(None)
+                continue
+
             # Check if df is a pandas DataFrame or Series
             if not isinstance(df, (pd.DataFrame, pd.Series)):
                 raise TypeError(
@@ -135,17 +161,18 @@ class TimeSeriesPreprocessor:
 
     @staticmethod
     def _align_timestamps(
-        *dfs: Union[pd.DataFrame, pd.Series]
+        *dfs: Optional[Union[pd.DataFrame, pd.Series]]
     ) -> Union[
-        Union[pd.DataFrame, pd.Series], Tuple[Union[pd.DataFrame, pd.Series]]
+        Optional[Union[pd.DataFrame, pd.Series]],
+        Tuple[Optional[Union[pd.DataFrame, pd.Series]]],
     ]:
         """
         Aligns the timestamps of multiple dataframes or series, in case they have different frequencies or missing time points.
 
         Parameters
         ----------
-        dfs : tuple of Union[pd.DataFrame, pd.Series]
-            One or more pandas DataFrames or Series with timestamps as index.
+        dfs : tuple of Optional[Union[pd.DataFrame, pd.Series]]
+            One or more pandas DataFrames or Series with timestamps as index, or None.
 
         Returns
         -------
@@ -153,29 +180,50 @@ class TimeSeriesPreprocessor:
             Aligned DataFrame(s) or Series. If a single DataFrame or Series was passed as input, a single DataFrame or Series is returned.
             If multiple DataFrames or Series were passed, a tuple of DataFrames or Series is returned.
         """
-        # Find common index across all DataFrames or Series
-        common_index = dfs[0].index
-        for df in dfs[1:]:
+        # Check if any of the inputs are None and handle them appropriately
+        non_none_dfs = [df for df in dfs if df is not None]
+        if not non_none_dfs:
+            raise ValueError(
+                "At least one DataFrame or Series must be provided."
+            )
+
+        # Find common index across all non-None DataFrames or Series
+        common_index = non_none_dfs[0].index
+        for df in non_none_dfs[1:]:
             common_index = common_index.intersection(df.index)
 
         # Reindex and forward fill missing values
-        output_dfs = [df.reindex(common_index, method="ffill") for df in dfs]
+        output_dfs = [
+            df.reindex(common_index, method="ffill")
+            if df is not None
+            else None
+            for df in dfs
+        ]
 
         if len(output_dfs) == 1:
             return output_dfs[0]
         else:
             return tuple(output_dfs)
 
-    def merge_y_and_weather_data(self) -> pd.DataFrame:
+    def merge_y_and_weather_data(self) -> Union[pd.DataFrame, pd.Series]:
         """
         Merges y_data and weather_data.
 
         Returns
         -------
-        pd.DataFrame
+        merged_data : pd.DataFrame
             Merged DataFrame.
         """
-        self._align_timestamps()
+        self.y_data, self.weather_data = self._handle_missing_indices(
+            self.y_data, self.weather_data
+        )
+        self.y_data, self.weather_data = self._handle_duplicate_indices(
+            self.y_data, self.weather_data
+        )
+        self.y_data, self.weather_data = self._align_timestamps(
+            self.y_data, self.weather_data
+        )
+
         if self.weather_data is None:
             return self.y_data
         else:

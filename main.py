@@ -29,7 +29,7 @@ df = preprocessor.merge_y_and_weather_data()
 # )
 
 # Train model
-forecaster = TimeSeriesForecaster(y_data, weather_data)
+forecaster = TimeSeriesTrainer(y_data, weather_data)
 q = forecaster.forecast(
     df=df, target_variable="Load", model_name="rr", metric_name="mae", step=96
 )
