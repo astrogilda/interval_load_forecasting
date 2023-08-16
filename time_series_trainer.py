@@ -1,4 +1,5 @@
 from functools import partial
+from typing import Any
 
 import mlflow
 import numpy as np
@@ -6,6 +7,7 @@ import optuna
 import pandas as pd
 import shap
 from matplotlib import pyplot as plt
+from numpy.typing import ArrayLike
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import (
@@ -29,10 +31,11 @@ from common_constants import (
     MODEL_NAME,
     OPTUNA_TRIALS,
     STEP_LENGTH,
+    TARGET_VARIABLE,
     VAL_LENGTH,
     WINDOW_LENGTH,
 )
-from time_series_Xy import TimeSeriesXy
+from time_series_xy import TimeSeriesXy
 
 
 class TimeSeriesTrainer:
@@ -85,20 +88,34 @@ class TimeSeriesTrainer:
         },
     }
 
-    def _log_shap_values(self, model, X_train, artifact_name):
+    def _log_shap_values(self, model, X_train, run_id: str):
+        """
+        Log SHAP values as artifacts.
+
+        Parameters
+        ----------
+        model : object
+            Trained model object.
+        X_train : pd.DataFrame
+            Training data.
+        run_id : str
+            Unique identifier for the run.
+        """
         # Calculate SHAP values
         explainer = shap.Explainer(model, X_train)
         shap_values = explainer(X_train)
 
         # Log SHAP values as a plot
+        shap_plot_path = f"shap_summary_{run_id}.png"
         shap.summary_plot(shap_values, X_train, show=False)
-        plt.savefig("shap_summary.png")
-        mlflow.log_artifact("shap_summary.png", artifact_name)
+        plt.savefig(shap_plot_path)
+        mlflow.log_artifact(shap_plot_path)
 
         # Log SHAP values as a DataFrame (optional)
+        shap_df_path = f"shap_values_{run_id}.csv"
         shap_df = pd.DataFrame(shap_values.values, columns=X_train.columns)
-        shap_df.to_csv("shap_values.csv")
-        mlflow.log_artifact("shap_values.csv", artifact_name)
+        shap_df.to_csv(shap_df_path)
+        mlflow.log_artifact(shap_df_path)
 
     def _create_cross_validator(
         self, cv_strategy: str = CV_STRATEGY
@@ -147,6 +164,7 @@ class TimeSeriesTrainer:
         target_variable: str,
         model_name: str,
         metric_name: str,
+        log_flag: bool = False,
     ) -> float:
         """
         Objective function for Optuna optimization.
@@ -163,6 +181,10 @@ class TimeSeriesTrainer:
             Name of the regression model to use. Must be one of: "rr", "rf", "xgb"
         metric_name : str
             Name of the metric to use for optimization. Must be one of: "mae", "rmse", "rmsle"
+        cv : object
+            Cross-validator object.
+        log_flag : bool
+            Flag to enable logging of parameters and metrics.
 
         Returns
         -------
@@ -210,17 +232,27 @@ class TimeSeriesTrainer:
             score = metric_func(y_test, model.predict(X_test))
             scores.append(score)
 
-        return np.mean(scores)
+        mean_score = np.mean(scores)
 
-    def forecast(
+        if log_flag:
+            # Log the parameters and metric for this trial
+            with mlflow.start_run(
+                run_name=f"{model_name}_trial_{trial.number}", nested=True
+            ):
+                mlflow.log_params(params)
+                mlflow.log_metric(metric_name, mean_score)
+
+        return mean_score
+
+    def train(
         self,
         df: pd.DataFrame,
-        target_variable: str,
+        target_variable: str = TARGET_VARIABLE,
         model_name: str = MODEL_NAME,
         metric_name: str = METRIC_NAME,
         cv_strategy: str = CV_STRATEGY,
         hpo_flag: bool = HPO_FLAG,
-    ) -> pd.DataFrame:
+    ) -> Any:
         """
         Perform walk forward forecasting using a specified regression model and parameter grid.
 
@@ -241,8 +273,8 @@ class TimeSeriesTrainer:
 
         Returns
         -------
-        y_true_all, y_pred_all : tuple of pd.Series
-            True and predicted values.
+        model : object
+            Trained model object.
         """
         if model_name not in self.model_mapping:
             raise ValueError(
@@ -257,9 +289,8 @@ class TimeSeriesTrainer:
         # Initialize cross-validator
         cv = self._create_cross_validator(cv_strategy)
 
-        y_true_all, y_pred_all, indices_all = [], [], []
-
-        mlflow.start_run()
+        mlflow.start_run(run_name=f"{model_name}_training")
+        run_id = mlflow.active_run().info.run_id
         # Log some basic information
         mlflow.log_params(
             {
@@ -298,10 +329,18 @@ class TimeSeriesTrainer:
         model_class = self.model_mapping[model_name]
         model = model_class(**best_params)
         X_train, y_train = TimeSeriesXy().df_to_X_y(df, target_variable)
-        model.fit(X_train, y_train)
+        model.fit(X_train.to_numpy(), y_train.to_numpy())
 
         # Log model
         mlflow.sklearn.log_model(model, f"model_{model_name}")
+
+        # Log SHAP values
+        self._log_shap_values(model, X_train, run_id)
+
+        # End the run
+        mlflow.end_run()
+
+        return model
 
         """
         y_pred = model.predict(X_test.to_numpy())

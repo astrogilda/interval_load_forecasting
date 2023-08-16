@@ -1,13 +1,20 @@
 from pathlib import Path
-from typing import Optional
+from typing import Any, Tuple
 
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
+from numpy.typing import ArrayLike
 
-from common_constants import CV_STRATEGY, INITIAL_TRAIN_LENGTH, TEST_LENGTH
-from time_series_preprocessor import TimeSeriesPreprocessor
+from common_constants import (
+    FORECAST_HORIZON,
+    INITIAL_TRAIN_LENGTH,
+    LAGS,
+    TARGET_VARIABLE,
+    TEST_LENGTH,
+)
 from time_series_trainer import TimeSeriesTrainer
+from time_series_xy import TimeSeriesXy
 
 
 class TimeSeriesSimulator:
@@ -20,33 +27,28 @@ class TimeSeriesSimulator:
         Number of steps to take between each iteration in the walk-forward validation.
     """
 
-    def __init__(
-        self, y_data: pd.DataFrame, weather_data: Optional[pd.DataFrame] = None
-    ) -> None:
+    def __init__(self, df: pd.DataFrame) -> None:
         """
         Constructs all the necessary attributes for the TimeSeriesRegression object.
 
         Parameters
         ----------
-        y_data : pd.DataFrame
-            Time series data.
-        weather_data : str
-            Exogenous weather data.
+        df : pd.DataFrame
+            DataFrame containing the combined y and weather data.
         """
-        self.y_data = y_data
-        self.weather_data = weather_data
+        self.df = df
 
-        if self.y_data is None:
-            raise ValueError(
-                "y_data and must be specified before calling simulate_production()."
-            )
+    def forecast(
+        self, df: pd.DataFrame, target_variable: str, model: Any
+    ) -> Tuple[ArrayLike, ArrayLike]:
+        X_test, y_test = TimeSeriesXy().df_to_X_y(df, target_variable)
+        y_test_pred = model.predict(X_test.to_numpy())
+        return y_test, y_test_pred
 
     def simulate_production(
         self,
         initial_size: int = INITIAL_TRAIN_LENGTH,
         test_length: int = TEST_LENGTH,
-        steps: int = 4,
-        cv_strategy: str = CV_STRATEGY,
     ) -> None:
         """
         Simulates a production environment where new data comes in steps.
@@ -58,23 +60,79 @@ class TimeSeriesSimulator:
         steps : int
             Number of steps to simulate in the production environment. This determines how many iterations the simulation will run.
         """
-        for i in range(initial_size, initial_size + steps):
-            # Merge y_data and weather_data
-            df = self._merge_y_and_weather_data()
+        y_true_all, y_pred_all, indices_all = [], [], []
 
-            forecaster = TimeSeriesTrainer(self.y_data, self.weather_data)
-            df_results = forecaster.forecast(
-                df=df,
-                target_variable=list(self.y_data)[0],  # type: ignore
-                model_name="rr",
-                metric_name="mae",
-                step=self.STEP_LENGTH,
-                cv_strategy=cv_strategy,
+        i = initial_size
+        while True:
+            # Merge y_data and weather_data
+            df_train, df_test = (
+                self.df.iloc[:i, :],
+                self.df.iloc[i : i + test_length, :],
+            )
+
+            # Break if there is no more data to simulate
+            if df_test.shape[0] == 0:
+                break
+
+            # Train model
+            trainer = TimeSeriesTrainer()
+            trained_model = trainer.train(df=df_train)
+
+            # Forecast
+            y_test, y_test_pred = self.forecast(
+                df_test, TARGET_VARIABLE, trained_model
             )
 
             self.save_simulation_results(df_results, f"results_step_{i}.csv")
 
             self.plot_simulation_results(f"results_step_{i}.csv")
+            # Update i
+            i = i + LAGS + FORECAST_HORIZON
+
+    def update_simulation_results(self):
+        """
+        y_pred = model.predict(X_test.to_numpy())
+        mae = mean_absolute_error(y_test, y_pred).
+
+        # Log metrics
+        mlflow.log_metric("mae", mae)
+
+        y_true_all.extend(list(y_test))
+        y_pred_all.extend(list(y_pred))
+        indices_all.extend(list(y_test.index))
+
+        mae = mean_absolute_error(y_true_all, y_pred_all)
+        print(f"Mean Absolute Error: {mae}")
+
+        # Log overall metrics
+        mlflow.log_metric("overall_mae", mae)
+
+        # Save the best model (optional)
+        mlflow.sklearn.save_model(model, "best_model")
+
+        # Add tags or notes (optional)
+        mlflow.set_tags(
+            {
+                "description": "Time series forecasting with walk-forward validation"
+            }
+        )
+
+        mlflow.end_run()
+
+        plot_series(
+            pd.Series(y_true_all, name="y_true"),
+            pd.Series(y_pred_all, name="y_pred"),
+        )
+
+        # return pd.Series(y_true_all, name='y_true'), pd.Series(y_pred_all, name='y_pred')
+
+        # Combine actual and predicted values into a DataFrame
+        df_results = pd.DataFrame(
+            {"actual": y_true_all, "predicted": y_pred_all}
+        )
+        df_results.index = indices_all
+        return df_results
+        """
 
     def save_simulation_results(
         self, df_results: pd.DataFrame, filename: str, folder: str = "results"
