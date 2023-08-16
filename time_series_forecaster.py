@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional, Tuple, Union
 
 import mlflow
@@ -129,11 +130,137 @@ class TimeSeriesForecaster:
                 "y_data and must be specified before calling simulate_production()."
             )
 
+    def _log_shap_values(self, model, X_train, artifact_name):
+        # Calculate SHAP values
+        explainer = shap.Explainer(model, X_train)
+        shap_values = explainer(X_train)
+
+        # Log SHAP values as a plot
+        shap.summary_plot(shap_values, X_train, show=False)
+        plt.savefig("shap_summary.png")
+        mlflow.log_artifact("shap_summary.png", artifact_name)
+
+        # Log SHAP values as a DataFrame (optional)
+        shap_df = pd.DataFrame(shap_values.values, columns=X_train.columns)
+        shap_df.to_csv("shap_values.csv")
+        mlflow.log_artifact("shap_values.csv", artifact_name)
+
+    def _create_cross_validator(
+        self, cv_strategy: str = CV_STRATEGY
+    ) -> BaseWindowSplitter:
+        """
+        Creates a cross-validator object.
+
+        Parameters
+        ----------
+        cv_strategy : str
+            Cross-validation strategy. Must be one of: "rolling", "expanding".
+        step_length : int
+            Number of steps to take between each iteration in the walk-forward validation.
+        fh : Union[list[int], np.ndarray]
+            Forecast horizon.
+
+        Returns
+        -------
+        cv : object
+            Cross-validator object.
+        """
+        if cv_strategy == "rolling":
+            cv = SlidingWindowSplitter(
+                window_length=self.WINDOW_LENGTH,
+                start_with_window=True,
+                step_length=self.STEP_LENGTH,
+                fh=np.arange(1, self.VAL_LENGTH + 1),
+            )
+        elif cv_strategy == "expanding":
+            cv = ExpandingWindowSplitter(
+                initial_window=self.INITIAL_WINDOW_LENGTH,
+                step_length=self.STEP_LENGTH,
+                fh=np.arange(1, self.VAL_LENGTH + 1),
+            )
+        else:
+            raise ValueError(
+                "cv_strategy must be one of: 'rolling', 'expanding'"
+            )
+        return cv
+
+    def _create_regression_data(
+        self,
+        df: pd.DataFrame,
+        target_variable: str,
+        fh: int = FORECAST_HORIZON,
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            DataFrame with a DateTime index, containing both y and optional weather data.
+        target_variable: str
+            Name of the target (y) variable.
+        fh : int
+            Forecast horizon.
+
+        Returns
+        -------
+        X : pd.DataFrame
+            DataFrame ready for regression, with optional weather data and (if requested) autoregressive features.
+        y : pd.DataFrame
+            DataFrame with the target variable.
+        """
+        # Create X and y
+        X = df.drop(columns=target_variable)
+        y = df[target_variable].shift(-(fh - 1)).dropna()
+
+        # Drop NaN values from y and corresponding rows from X
+        nan_rows = y.isna()
+        y = y.dropna()
+        X = X.loc[~nan_rows]
+
+        return X, y
+
+    def df_to_X_y(
+        self, df: pd.DataFrame, target_variable: str
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            DataFrame with a DateTime index, containing both y and optional weather data.
+        target_variable: str
+            Name of the target (y) variable.
+
+        Returns
+        -------
+        X : pd.DataFrame
+            DataFrame ready for regression, with optional weather data and (if requested) autoregressive features.
+        y : pd.Series
+            Series with the target variable.
+        """
+        # Create features
+        df, _ = TimeSeriesFeaturizer.create_features(
+            df,
+            target_variable,
+            ar_from_y=self.AR_FROM_Y,
+            ar_from_weather_data=self.AR_FROM_WEATHER_DATA,
+            lags=self.LAGS,
+            max_lags=self.MAX_LAGS,
+            use_pacf=False,  # for multi-step forecasting, use_pacf must be False
+        )
+        # Create X and y
+        X, y = self._create_regression_data(
+            df, target_variable, self.FORECAST_HORIZON
+        )
+        return X, y
+
     def _objective(
         self,
         trial,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
+        df: pd.DataFrame,
+        target_variable: str,
         model_name: str,
         metric_name: str,
     ) -> float:
@@ -144,10 +271,10 @@ class TimeSeriesForecaster:
         ----------
         trial : object
             Optuna trial object.
-        X_train : np.ndarray
-            Training data.
-        y_train : np.ndarray
-            Training labels.
+        df : pd.DataFrame
+            DataFrame with y and weather data.
+        target_variable : str
+            Name of the target variable in df.
         model_name : str
             Name of the regression model to use. Must be one of: "rr", "rf", "xgb"
         metric_name : str
@@ -180,100 +307,28 @@ class TimeSeriesForecaster:
         # Create the model
         model_class = self.model_mapping[model_name]
         model = model_class(**params)
-        # Fit the model
-        model.fit(X_train, y_train)
-        # Return the metric
-        return metric_func(y_train, model.predict(X_train))
+        # Create the cross-validator
+        cv = self._create_cross_validator()
+        # Initialize the scores list
+        scores = []
 
-    def _log_shap_values(self, model, X_train, artifact_name):
-        # Calculate SHAP values
-        explainer = shap.Explainer(model, X_train)
-        shap_values = explainer(X_train)
+        # Iterate over the cross-validation splits
+        for train_index, test_index in cv.split(df):
+            # Split the data
+            train, test = df.iloc[train_index], df.iloc[test_index]
+            # Create X and y
+            X_train, y_train = self.df_to_X_y(train, target_variable)
+            X_test, y_test = self.df_to_X_y(test, target_variable)
+            # Convert to numpy arrays
+            X_train, y_train = X_train.to_numpy(), y_train.to_numpy()
+            X_test, y_test = X_test.to_numpy(), y_test.to_numpy()
+            # Fit the model
+            model.fit(X_train, y_train)
+            # Return the metric
+            score = metric_func(y_test, model.predict(X_test))
+            scores.append(score)
 
-        # Log SHAP values as a plot
-        shap.summary_plot(shap_values, X_train, show=False)
-        plt.savefig("shap_summary.png")
-        mlflow.log_artifact("shap_summary.png", artifact_name)
-
-        # Log SHAP values as a DataFrame (optional)
-        shap_df = pd.DataFrame(shap_values.values, columns=X_train.columns)
-        shap_df.to_csv("shap_values.csv")
-        mlflow.log_artifact("shap_values.csv", artifact_name)
-
-    def _create_cross_validator(
-        self,
-        cv_strategy: str,
-        step_length: int,
-        fh: Union[list[int], np.ndarray],
-    ) -> BaseWindowSplitter:
-        """
-        Creates a cross-validator object.
-
-        Parameters
-        ----------
-        cv_strategy : str
-            Cross-validation strategy. Must be one of: "rolling", "expanding".
-        step_length : int
-            Number of steps to take between each iteration in the walk-forward validation.
-        fh : Union[list[int], np.ndarray]
-            Forecast horizon.
-
-        Returns
-        -------
-        cv : object
-            Cross-validator object.
-        """
-        if cv_strategy == "rolling":
-            cv = SlidingWindowSplitter(
-                window_length=self.WINDOW_LENGTH,
-                start_with_window=True,
-                step_length=step_length,
-                fh=fh,
-            )
-        elif cv_strategy == "expanding":
-            cv = ExpandingWindowSplitter(
-                initial_window=self.INITIAL_WINDOW_LENGTH,
-                step_length=step_length,
-                fh=fh,
-            )
-        else:
-            raise ValueError(
-                "cv_strategy must be one of: 'rolling', 'expanding'"
-            )
-        return cv
-
-    def _create_regression_data(
-        self, df: pd.DataFrame, target_variable: str, fh: int
-    ) -> Tuple[pd.DataFrame, Union[pd.DataFrame, pd.Series]]:
-        """
-        Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
-
-        Parameters
-        ----------
-        df: pd.DataFrame
-            DataFrame with a DateTime index, containing both y and optional weather data.
-        target_variable: str
-            Name of the target (y) variable.
-        fh : int
-            Forecast horizon.
-
-        Returns
-        -------
-        X : pd.DataFrame
-            DataFrame ready for regression, with optional weather data and (if requested) autoregressive features.
-        y : pd.DataFrame
-            DataFrame with the target variable.
-        """
-        # Create X and y
-        X = df.drop(columns=target_variable)
-        y = df[target_variable].shift(-(fh - 1)).dropna()
-
-        # Drop NaN values from y and corresponding rows from X
-        nan_rows = y.isna()
-        y = y.dropna()
-        X = X.loc[~nan_rows]
-
-        return X, y
+        return np.mean(scores)
 
     def forecast(
         self,
@@ -281,7 +336,6 @@ class TimeSeriesForecaster:
         target_variable: str,
         model_name: str,
         metric_name: str,
-        step: int,
         cv_strategy: str = CV_STRATEGY,
         hpo_flag: bool = HPO_FLAG,
     ) -> pd.DataFrame:
@@ -298,8 +352,6 @@ class TimeSeriesForecaster:
             Name of the regression model to use. Must be one of: "rr", "rf", "xgb"
         metric_name : str
             Name of the metric to use for optimization. Must be one of: "mae", "rmse", "rmsle"
-        step : int
-            Number of steps to forecast. This determines the forecast horizon for each iteration in the walk-forward validation.
         cv_strategy : str
             Cross-validation strategy. Must be one of: "rolling", "expanding".
         hpo_flag : bool
@@ -320,12 +372,8 @@ class TimeSeriesForecaster:
                 f"metric_name must be one of: {list(self.objective_metrics.keys())}"
             )
 
-        # fh is the forecast horizon, i.e. the number of steps to forecast. step_length is the number of steps to take between each iteration.
-        step_length = step + 1
-        fh = np.arange(1, step + 1)
-
         # Initialize cross-validator
-        cv = self._create_cross_validator(cv_strategy, step_length, fh)
+        # cv = self._create_cross_validator(cv_strategy)
 
         y_true_all, y_pred_all, indices_all = [], [], []
 
@@ -335,81 +383,56 @@ class TimeSeriesForecaster:
             {
                 "model_name": model_name,
                 "cv_strategy": cv_strategy,
-                "step": step,
+                "window_length": self.WINDOW_LENGTH,
+                "initial_window_length": self.INITIAL_WINDOW_LENGTH,
+                "step_length": self.STEP_LENGTH,
                 "metric_name": metric_name,
             }
         )
 
-        def featurizer(x):
-            return TimeSeriesFeaturizer.create_features(
-                x,
-                target_variable,
-                ar_from_y=self.AR_FROM_Y,
-                ar_from_weather_data=self.AR_FROM_WEATHER_DATA,
-                lags=step_length or self.LAGS,
-                max_lags=step_length or self.MAX_LAGS,
+        best_params = {}
+        if hpo_flag:
+            study = optuna.create_study(direction="minimize")
+            study.optimize(
+                partial(
+                    self._objective,
+                    df=df,
+                    target_variable=target_variable,
+                    model_name=model_name,
+                    metric_name=metric_name,
+                ),
+                n_trials=self.OPTUNA_TRIALS,
             )
 
-        for train_index, test_index in cv.split(df):
-            train, test = df.iloc[train_index], df.iloc[test_index]
-            print(train.shape, test.shape)
+            # Best hyperparameters
+            best_params = study.best_params
+            best_score = study.best_value
 
-            train, _ = featurizer(train)
-            test, _ = featurizer(test)
-            print("Featurization done\n")
-            print(f"Train shape: {train.shape}, Test shape: {test.shape}")
-            print(f"Train: {train.head()}")
-            print(f"Test: {test.head()}")
+            # Log parameters and metrics
+            mlflow.log_params(best_params)
+            mlflow.log_metric("best_hpo_score", best_score)
 
-            X_train, y_train = self._create_regression_data(
-                train, target_variable, step
-            )
-            X_test, y_test = self._create_regression_data(
-                test, target_variable, step
-            )
+        model_class = self.model_mapping[model_name]
+        model = model_class(**best_params)
+        X_train, y_train = self.df_to_X_y(df, target_variable)
+        model.fit(X_train, y_train)
 
-            X_train, y_train = X_train.to_numpy(), y_train.to_numpy()
+        # Log model
+        mlflow.sklearn.log_model(model, f"model_{model_name}")
 
-            # Optuna optimization
-            param_grid = {}
-            if hpo_flag:
-                study = optuna.create_study(direction="minimize")
-                study.optimize(
-                    lambda trial, X_train=X_train, y_train=y_train: self._objective(
-                        trial,
-                        X_train,
-                        y_train,
-                        model_name,
-                        metric_name,
-                    ),
-                    n_trials=self.OPTUNA_TRIALS,
-                )
+        """
+        y_pred = model.predict(X_test.to_numpy())
+        mae = mean_absolute_error(y_test, y_pred)
 
-                # Best hyperparameters
-                param_grid = study.best_params
+        # Log metrics
+        mlflow.log_metric("mae", mae)
 
-                # Log parameters and metrics
-                mlflow.log_params(param_grid)
+        # Log SHAP values
+        self._log_shap_values(model, X_train, f"shap_{model_name}")
 
-            model_class = self.model_mapping[model_name]
-            model = model_class(**param_grid)
-            model.fit(X_train, y_train)
-
-            # Log model
-            mlflow.sklearn.log_model(model, f"model_{model_name}")
-
-            y_pred = model.predict(X_test.to_numpy())
-            mae = mean_absolute_error(y_test, y_pred)
-
-            # Log metrics
-            mlflow.log_metric("mae", mae)
-
-            # Log SHAP values
-            self._log_shap_values(model, X_train, f"shap_{model_name}")
-
-            y_true_all.extend(list(y_test))
-            y_pred_all.extend(list(y_pred))
-            indices_all.extend(list(X_test.index))
+        y_true_all.extend(list(y_test))
+        y_pred_all.extend(list(y_pred))
+        indices_all.extend(list(X_test.index))
 
         mae = mean_absolute_error(y_true_all, y_pred_all)
         print(f"Mean Absolute Error: {mae}")
@@ -442,3 +465,4 @@ class TimeSeriesForecaster:
         )
         df_results.index = indices_all
         return df_results
+        """
