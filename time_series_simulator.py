@@ -1,4 +1,3 @@
-from multiprocessing.pool import INIT
 from pathlib import Path
 from typing import Optional
 
@@ -6,8 +5,9 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from common_constants import INITIAL_TRAIN_LENGTH, TEST_LENGTH
-from time_series_forecaster import TimeSeriesForecaster
+from common_constants import CV_STRATEGY, INITIAL_TRAIN_LENGTH, TEST_LENGTH
+from time_series_preprocessor import TimeSeriesPreprocessor
+from time_series_trainer import TimeSeriesTrainer
 
 
 class TimeSeriesSimulator:
@@ -19,8 +19,6 @@ class TimeSeriesSimulator:
     STEP_LENGTH : int
         Number of steps to take between each iteration in the walk-forward validation.
     """
-
-    STEP_LENGTH = 24 * 7  # 1 week
 
     def __init__(
         self, y_data: pd.DataFrame, weather_data: Optional[pd.DataFrame] = None
@@ -43,28 +41,12 @@ class TimeSeriesSimulator:
                 "y_data and must be specified before calling simulate_production()."
             )
 
-    def merge_y_and_weather_data(self) -> pd.DataFrame:
-        """
-        Merges y_data and weather_data.
-
-        Returns
-        -------
-        pd.DataFrame
-            Merged DataFrame.
-        """
-        if self.weather_data is None:
-            return self.y_data
-        else:
-            return pd.merge(
-                self.y_data,
-                self.weather_data,
-                left_index=True,
-                right_index=True,
-                how="inner",
-            )
-
     def simulate_production(
-        self, initial_size: int, steps: int, cv_strategy: str = "rolling"
+        self,
+        initial_size: int = INITIAL_TRAIN_LENGTH,
+        test_length: int = TEST_LENGTH,
+        steps: int = 4,
+        cv_strategy: str = CV_STRATEGY,
     ) -> None:
         """
         Simulates a production environment where new data comes in steps.
@@ -78,9 +60,9 @@ class TimeSeriesSimulator:
         """
         for i in range(initial_size, initial_size + steps):
             # Merge y_data and weather_data
-            df = self.merge_y_and_weather_data()
+            df = self._merge_y_and_weather_data()
 
-            forecaster = TimeSeriesForecaster(self.y_data, self.weather_data)
+            forecaster = TimeSeriesTrainer(self.y_data, self.weather_data)
             df_results = forecaster.forecast(
                 df=df,
                 target_variable=list(self.y_data)[0],  # type: ignore

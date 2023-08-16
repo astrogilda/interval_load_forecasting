@@ -6,9 +6,9 @@ from sktime.forecasting.model_selection import (
 
 from time_series_eda import TimeSeriesEDA
 from time_series_featurizer import TimeSeriesFeaturizer
-from time_series_forecaster import TimeSeriesForecaster
 from time_series_loader import TimeSeriesLoader
 from time_series_preprocessor import TimeSeriesPreprocessor
+from time_series_trainer import TimeSeriesTrainer
 
 # Load data
 data_loader = TimeSeriesLoader(y_file="data/load.csv")
@@ -19,8 +19,8 @@ y_data, weather_data = data_loader.y_data, data_loader.weather_data
 # eda.perform_eda(y_data, target_variable="Load", freq=24, lags=40)  # type: ignore
 
 # Preprocess data
-preprocessor = TimeSeriesPreprocessor(y_data, weather_data)  # type: ignore
-y_data, weather_data = preprocessor.align_timestamps()
+preprocessor = TimeSeriesPreprocessor(y_data, weather_data)
+df = preprocessor.merge_y_and_weather_data()
 
 # Prepare data
 # featurizer = TimeSeriesFeaturizer()

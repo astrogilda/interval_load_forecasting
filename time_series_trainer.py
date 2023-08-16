@@ -35,7 +35,7 @@ from common_constants import (
 from time_series_Xy import TimeSeriesXy
 
 
-class TimeSeriesForecaster:
+class TimeSeriesTrainer:
     """
     Time series regression and simulation class.
 

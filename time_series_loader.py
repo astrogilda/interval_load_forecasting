@@ -20,7 +20,7 @@ class TimeSeriesLoader:
         self, y_file: str, weather_data_file: Optional[str] = None
     ) -> None:
         """
-        Constructs all the necessary attributes for the TimeSeriesPreprocessor object.
+        Constructs all the necessary attributes for the TimeSeriesLoader object.
 
         Parameters
         ----------
