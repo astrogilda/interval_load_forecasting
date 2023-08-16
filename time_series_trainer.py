@@ -66,9 +66,12 @@ class TimeSeriesTrainer:
         run_id : str
             Unique identifier for the run.
         """
+        print(f"X_train shape: {X_train.shape}")
+        print(f"X_train.head():\n{X_train.head()}")
         # Calculate SHAP values
         explainer = shap.Explainer(model, X_train)
         shap_values = explainer(X_train)
+        print(f"shap_values.shape: {shap_values.shape}")
 
         # Log SHAP values as a plot
         shap_plot_path = f"shap_summary_{run_id}.png"
@@ -186,8 +189,8 @@ class TimeSeriesTrainer:
             # Split the data
             train, test = df.iloc[train_index], df.iloc[test_index]
             # Create X and y
-            X_train, y_train = TimeSeriesXy().df_to_X_y(train, target_variable)
-            X_test, y_test = TimeSeriesXy().df_to_X_y(test, target_variable)
+            X_train, y_train = TimeSeriesXy.df_to_X_y(train, target_variable)
+            X_test, y_test = TimeSeriesXy.df_to_X_y(test, target_variable)
             # Convert to numpy arrays
             X_train, y_train = X_train.to_numpy(), y_train.to_numpy()
             X_test, y_test = X_test.to_numpy(), y_test.to_numpy()
@@ -293,14 +296,14 @@ class TimeSeriesTrainer:
 
         model_class = MODEL_MAPPING[model_name]
         model = model_class(**best_params)
-        X_train, y_train = TimeSeriesXy().df_to_X_y(df, target_variable)
+        X_train, y_train = TimeSeriesXy.df_to_X_y(df, target_variable)
         model.fit(X_train.to_numpy(), y_train.to_numpy())
 
         # Log model
         mlflow.sklearn.log_model(model, f"model_{model_name}")
 
-        # Log SHAP values
-        self._log_shap_values(model, X_train, run_id)
+        # Calculate and log SHAP values
+        # self._log_shap_values(model, X_train, run_id)
 
         # End the run
         mlflow.end_run()

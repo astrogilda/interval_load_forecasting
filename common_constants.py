@@ -24,11 +24,11 @@ TARGET_VARIABLE = "Load"  # Target variable name
 AR_FROM_Y = True  # Autoregressive features from y
 AR_FROM_WEATHER_DATA = False  # Autoregressive features from weather data
 LAGS = (
-    FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
-)  # Number of lags to use for autoregressive features; 1 week
+    FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * 3
+)  # Number of lags to use for autoregressive features; 3 days
 MAX_LAGS = (
-    FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
-)  # Maximum number of lags to use for autoregressive features; 1 week
+    FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * 3
+)  # Maximum number of lags to use for autoregressive features; 3 days
 
 # For creating X and y
 FORECAST_HORIZON = (

@@ -23,6 +23,13 @@ from time_series_xy import TimeSeriesXy
 class TimeSeriesSimulator:
     """
     Simulates a production environment where new data comes in steps.
+
+    Attributes
+    ----------
+    df_test : pd.DataFrame
+        DataFrame containing the test data.
+    df_test_pred : pd.DataFrame
+        DataFrame containing the predicted values.
     """
 
     def __init__(self, df: pd.DataFrame) -> None:
@@ -35,12 +42,38 @@ class TimeSeriesSimulator:
             DataFrame containing the combined y and weather data.
         """
         self.df = df
+        self.df_test = pd.DataFrame()
+        self.df_test_pred = pd.DataFrame()
 
+    @staticmethod
     def forecast(
-        self, df: pd.DataFrame, target_variable: str, model: Any
-    ) -> Tuple[ArrayLike, ArrayLike]:
+        df: pd.DataFrame, target_variable: str, model: Any
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Forecast using the trained model.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing the combined y and weather data.
+        target_variable : str
+            Target variable name.
+        model : Any
+            Trained model.
+
+        Returns
+        -------
+        y_test : pd.DataFrame
+            DataFrame containing the actual values.
+        y_test_pred : pd.DataFrame
+            DataFrame containing the predicted values.
+        """
         X_test, y_test = TimeSeriesXy().df_to_X_y(df, target_variable)
         y_test_pred = model.predict(X_test.to_numpy())
+        y_test_pred = pd.DataFrame(
+            y_test_pred, index=y_test.index, columns=y_test.columns
+        )
+
         return y_test, y_test_pred
 
     def simulate_production(
@@ -59,8 +92,6 @@ class TimeSeriesSimulator:
         test_length : int
             Number of steps to simulate in the production environment. This determines how many iterations the simulation will run.
         """
-        y_true_all, y_pred_all, indices_all = [], [], []
-
         i = initial_size
         while True:
             # Merge y_data and weather_data
@@ -70,7 +101,8 @@ class TimeSeriesSimulator:
             )
 
             # Break if there is no more data to simulate
-            if df_test.shape[0] == 0:
+            # print(f"df_test.shape: {df_test.shape}")
+            if df_test.shape[0] < LAGS + FORECAST_HORIZON + 1:
                 break
 
             # Train model
@@ -78,75 +110,59 @@ class TimeSeriesSimulator:
             trained_model = trainer.train(df=df_train)
 
             # Forecast
-            y_test, y_test_pred = self.forecast(
+            df_test, df_test_pred = TimeSeriesSimulator.forecast(
                 df_test, TARGET_VARIABLE, trained_model
             )
+            # print(f"df_test.shape: {df_test.shape}")
+            # print(f"df_test_pred.shape: {df_test_pred.shape}")
+            # print("")
 
             # Update simulation results
             self.update_simulation_results(
                 metric_name,
-                y_test,
-                y_test_pred,
-                y_true_all,
-                y_pred_all,
-                indices_all,
+                df_test,
+                df_test_pred,
             )
 
             # Update i
             i = i + LAGS + FORECAST_HORIZON
 
+        metric_func = OBJECTIVE_METRICS[metric_name]
+        overall_score = metric_func(self.df_test, self.df_test_pred)
+
+        # Log overall metrics
+        mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
+
     def update_simulation_results(
         self,
         metric_name,
-        y_test,
-        y_test_pred,
-        y_true_all,
-        y_pred_all,
-        indices_all,
-    ):
+        df_test,
+        df_test_pred,
+    ) -> None:
         """
         Update simulation results and log metrics.
 
         Parameters
         ----------
-        y_test : ArrayLike
-            Actual values.
-        y_test_pred : ArrayLike
-            Predicted values.
-        y_true_all : list
-            List of all true values.
-        y_pred_all : list
-            List of all predicted values.
-        indices_all : list
-            List of indices.
+        metric_name : str
+            Metric name.
+        df_test_pred : pd.DataFrame
+            DataFrame containing the test data, including the actual values and the predicted values.
         """
         metric_func = OBJECTIVE_METRICS[metric_name]
 
-        score = metric_func(y_test, y_test_pred)
+        score = metric_func(df_test, df_test_pred)
         # Log metrics for this simulation run
         with mlflow.start_run(run_name="simulation_run", nested=True):
             mlflow.log_metric(f"{metric_name}_score", score)
 
-        y_true_all.extend(list(y_test))
-        y_pred_all.extend(list(y_test_pred))
-        indices_all.extend(list(y_test.index))
-
-        overall_score = metric_func(y_true_all, y_pred_all)
-
-        # Log overall metrics
-        mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
-
         # Combine actual and predicted values into a DataFrame
-        df_results = pd.DataFrame(
-            {"actual": y_true_all, "predicted": y_pred_all}
-        )
-        df_results.index = indices_all
-
-        return df_results
+        self.df_test = pd.concat([self.df_test, df_test])
+        self.df_test_pred = pd.concat([self.df_test_pred, df_test_pred])
 
     def save_simulation_results(
         self, df_results: pd.DataFrame, filename: str, folder: str = "results"
-    ):
+    ) -> None:
         """
         Saves the simulation results (actual and predicted values) to a CSV file.
 

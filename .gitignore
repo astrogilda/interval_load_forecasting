@@ -3,14 +3,11 @@ venv/
 .vscode/
 *cache
 __pycache__/
+mlruns/
+DS_Forecasting_Take_Home_2023.ipynb
 
 # Temporary
 figures/
 results/
-mlruns/
 EDA.py
-DS_Forecasting_Take_Home_2023.ipynb
-timeseriesanalysis.py
-timeseriesmodel.py
-timeseriesregression.py
 

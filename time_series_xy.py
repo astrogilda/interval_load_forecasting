@@ -1,3 +1,4 @@
+from math import nan
 from typing import Tuple
 
 import pandas as pd
@@ -61,21 +62,22 @@ class TimeSeriesXy:
         if isinstance(X, pd.Series):
             X = X.to_frame()
 
+        # Add future values of y
         y_columns = {}
-        for i in range(fh):
-            y_columns[f"y_fh_{i+1}"] = df[target_variable].shift(i)
+        for i in range(1, fh + 1):
+            y_columns[f"y_fh_{i}"] = df[target_variable].shift(i)
 
         y = pd.DataFrame(y_columns)
 
-        # Drop NaN values from y and corresponding rows from X
-        nan_rows = y.isna()
+        # Drop rows with NaNs
         y = y.dropna()
-        X = X.loc[~nan_rows]
+        X = X.loc[y.index]
 
         return X, y
 
+    @staticmethod
     def df_to_X_y(
-        self, df: pd.DataFrame, target_variable: str
+        df: pd.DataFrame, target_variable: str
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.

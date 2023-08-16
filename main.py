@@ -8,6 +8,7 @@ from time_series_eda import TimeSeriesEDA
 from time_series_featurizer import TimeSeriesFeaturizer
 from time_series_loader import TimeSeriesLoader
 from time_series_preprocessor import TimeSeriesPreprocessor
+from time_series_simulator import TimeSeriesSimulator
 from time_series_trainer import TimeSeriesTrainer
 
 # Load data
@@ -22,18 +23,25 @@ y_data, weather_data = data_loader.y_data, data_loader.weather_data
 preprocessor = TimeSeriesPreprocessor(y_data, weather_data)
 df = preprocessor.merge_y_and_weather_data()
 
+# Simulate production
+simulator = TimeSeriesSimulator(df)
+simulator.simulate_production()
+
 # Prepare data
 # featurizer = TimeSeriesFeaturizer()
 # df, max_lags = featurizer.create_features(
 #    y_data, "Load", use_pacf=False, max_lags=96 * 7, lags=96
 # )
 
-# Train model
-forecaster = TimeSeriesTrainer(y_data, weather_data)
-q = forecaster.forecast(
-    df=df, target_variable="Load", model_name="rr", metric_name="mae", step=96
-)
+df_train, df_test = df.iloc[: -96 * 30 * 3], df.iloc[-96 * 30 * 3 :]
 
+# Train model
+trainer = TimeSeriesTrainer()
+trained_model = trainer.train(df=df_train)
+
+y_test, y_test_pred = TimeSeriesSimulator.forecast(
+    df_test, "Load", trained_model
+)
 
 cv = SlidingWindowSplitter(
     window_length=96 * 30 * 3,
