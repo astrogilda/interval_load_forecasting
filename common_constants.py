@@ -37,7 +37,10 @@ VAL_LENGTH = (
 OPTUNA_TRIALS = 100
 HPO_FLAG = False  # Flag to enable hyperparameter optimization
 CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
-
+MODEL_NAME = (
+    "rr"  # Model name. Must be one of: "rr", "xgb", "lgbm", "rf", "mlp"
+)
+METRIC_NAME = "mae"  # Metric name. Must be one of: "mae", "mse", "rmse", "rmsle", "mape", "smape", "r2", "corr"
 
 # For simulating production
 INITIAL_TRAIN_LENGTH = (

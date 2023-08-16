@@ -23,10 +23,10 @@ preprocessor = TimeSeriesPreprocessor(y_data, weather_data)  # type: ignore
 y_data, weather_data = preprocessor.align_timestamps()
 
 # Prepare data
-featurizer = TimeSeriesFeaturizer()
-df, max_lags = featurizer.create_features(
-    y_data, "Load", use_pacf=False, max_lags=96 * 7, lags=96
-)
+# featurizer = TimeSeriesFeaturizer()
+# df, max_lags = featurizer.create_features(
+#    y_data, "Load", use_pacf=False, max_lags=96 * 7, lags=96
+# )
 
 # Train model
 forecaster = TimeSeriesForecaster(y_data, weather_data)

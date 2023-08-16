@@ -43,6 +43,26 @@ class TimeSeriesSimulator:
                 "y_data and must be specified before calling simulate_production()."
             )
 
+    def merge_y_and_weather_data(self) -> pd.DataFrame:
+        """
+        Merges y_data and weather_data.
+
+        Returns
+        -------
+        pd.DataFrame
+            Merged DataFrame.
+        """
+        if self.weather_data is None:
+            return self.y_data
+        else:
+            return pd.merge(
+                self.y_data,
+                self.weather_data,
+                left_index=True,
+                right_index=True,
+                how="inner",
+            )
+
     def simulate_production(
         self, initial_size: int, steps: int, cv_strategy: str = "rolling"
     ) -> None:
@@ -58,16 +78,7 @@ class TimeSeriesSimulator:
         """
         for i in range(initial_size, initial_size + steps):
             # Merge y_data and weather_data
-            if self.weather_data is None:
-                df = self.y_data.iloc[: i + 1]
-            else:
-                df = pd.merge(
-                    self.y_data.iloc[: i + 1],
-                    self.weather_data.iloc[: i + 1],
-                    left_index=True,
-                    right_index=True,
-                    how="inner",
-                )
+            df = self.merge_y_and_weather_data()
 
             forecaster = TimeSeriesForecaster(self.y_data, self.weather_data)
             df_results = forecaster.forecast(
