@@ -1,3 +1,4 @@
+from multiprocessing.pool import INIT
 from pathlib import Path
 from typing import Optional
 
@@ -5,11 +6,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from time_constants import (
-    DAYS_PER_MONTH,
-    FIFTEEN_MINUTES_PER_HOUR,
-    HOURS_PER_DAY,
-)
+from common_constants import INITIAL_TRAIN_LENGTH, TEST_LENGTH
 from time_series_forecaster import TimeSeriesForecaster
 
 
@@ -23,9 +20,6 @@ class TimeSeriesSimulator:
         Number of steps to take between each iteration in the walk-forward validation.
     """
 
-    TEST_LENGTH = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
-    )  # 1 month
     STEP_LENGTH = 24 * 7  # 1 week
 
     def __init__(

@@ -2,10 +2,12 @@ from typing import Tuple
 
 import pandas as pd
 
-from time_constants import (
-    DAYS_PER_WEEK,
-    FIFTEEN_MINUTES_PER_HOUR,
-    HOURS_PER_DAY,
+from common_constants import (
+    AR_FROM_WEATHER_DATA,
+    AR_FROM_Y,
+    FORECAST_HORIZON,
+    LAGS,
+    MAX_LAGS,
 )
 from time_series_featurizer import TimeSeriesFeaturizer
 
@@ -27,18 +29,6 @@ class TimeSeriesXy:
     FORECAST_HORIZON : int
         Number of steps to forecast.
     """
-
-    AR_FROM_Y = True  # Autoregressive features from y
-    AR_FROM_WEATHER_DATA = False  # Autoregressive features from weather data
-    LAGS = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
-    )  # Number of lags to use for autoregressive features; 1 week
-    MAX_LAGS = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
-    )  # Maximum number of lags to use for autoregressive features; 1 week
-    FORECAST_HORIZON = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
-    )  # Number of steps to forecast; 1 day
 
     @staticmethod
     def _create_regression_data(
@@ -108,14 +98,14 @@ class TimeSeriesXy:
         df, _ = TimeSeriesFeaturizer.create_features(
             df,
             target_variable,
-            ar_from_y=self.AR_FROM_Y,
-            ar_from_weather_data=self.AR_FROM_WEATHER_DATA,
-            lags=self.LAGS,
-            max_lags=self.MAX_LAGS,
+            ar_from_y=AR_FROM_Y,
+            ar_from_weather_data=AR_FROM_WEATHER_DATA,
+            lags=LAGS,
+            max_lags=MAX_LAGS,
             use_pacf=False,  # for multi-step forecasting, use_pacf must be False
         )
         # Create X and y
         X, y = TimeSeriesXy._create_regression_data(
-            df, target_variable, self.FORECAST_HORIZON
+            df, target_variable, FORECAST_HORIZON
         )
         return X, y

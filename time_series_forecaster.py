@@ -21,10 +21,14 @@ from sktime.forecasting.model_selection._split import BaseWindowSplitter
 from sktime.utils.plotting import plot_series
 from xgboost import XGBRegressor
 
-from time_constants import (
-    DAYS_PER_MONTH,
-    FIFTEEN_MINUTES_PER_HOUR,
-    HOURS_PER_DAY,
+from common_constants import (
+    CV_STRATEGY,
+    HPO_FLAG,
+    INITIAL_WINDOW_LENGTH,
+    OPTUNA_TRIALS,
+    STEP_LENGTH,
+    VAL_LENGTH,
+    WINDOW_LENGTH,
 )
 from time_series_Xy import TimeSeriesXy
 
@@ -50,22 +54,6 @@ class TimeSeriesForecaster:
     model_mapping : dict
         Model names to model classes mapping.
     """
-
-    WINDOW_LENGTH = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH * 3
-    )  # 3 months
-    INITIAL_WINDOW_LENGTH = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * HOURS_PER_DAY * 3
-    )  # 3 months
-    STEP_LENGTH = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
-    )  # 1 month
-    VAL_LENGTH = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
-    )  # 1 month
-    OPTUNA_TRIALS = 100
-    HPO_FLAG = False  # Flag to enable hyperparameter optimization
-    CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
 
     # Define metrics for Optuna objective function
     objective_metrics = {
@@ -132,16 +120,16 @@ class TimeSeriesForecaster:
         """
         if cv_strategy == "rolling":
             cv = SlidingWindowSplitter(
-                window_length=self.WINDOW_LENGTH,
+                window_length=WINDOW_LENGTH,
                 start_with_window=True,
-                step_length=self.STEP_LENGTH,
-                fh=np.arange(1, self.VAL_LENGTH + 1),
+                step_length=STEP_LENGTH,
+                fh=np.arange(1, VAL_LENGTH + 1),
             )
         elif cv_strategy == "expanding":
             cv = ExpandingWindowSplitter(
-                initial_window=self.INITIAL_WINDOW_LENGTH,
-                step_length=self.STEP_LENGTH,
-                fh=np.arange(1, self.VAL_LENGTH + 1),
+                initial_window=INITIAL_WINDOW_LENGTH,
+                step_length=STEP_LENGTH,
+                fh=np.arange(1, VAL_LENGTH + 1),
             )
         else:
             raise ValueError(
@@ -275,9 +263,9 @@ class TimeSeriesForecaster:
             {
                 "model_name": model_name,
                 "cv_strategy": cv_strategy,
-                "window_length": self.WINDOW_LENGTH,
-                "initial_window_length": self.INITIAL_WINDOW_LENGTH,
-                "step_length": self.STEP_LENGTH,
+                "window_length": WINDOW_LENGTH,
+                "initial_window_length": INITIAL_WINDOW_LENGTH,
+                "step_length": STEP_LENGTH,
                 "metric_name": metric_name,
             }
         )
@@ -294,7 +282,7 @@ class TimeSeriesForecaster:
                     model_name=model_name,
                     metric_name=metric_name,
                 ),
-                n_trials=self.OPTUNA_TRIALS,
+                n_trials=OPTUNA_TRIALS,
             )
 
             # Best hyperparameters
