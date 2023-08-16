@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Optional, Tuple, Union
 
 import mlflow
 import numpy as np
@@ -7,7 +6,6 @@ import optuna
 import pandas as pd
 import shap
 from matplotlib import pyplot as plt
-from pytz import HOUR
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import (
@@ -25,11 +23,10 @@ from xgboost import XGBRegressor
 
 from time_constants import (
     DAYS_PER_MONTH,
-    DAYS_PER_WEEK,
     FIFTEEN_MINUTES_PER_HOUR,
     HOURS_PER_DAY,
 )
-from time_series_featurizer import TimeSeriesFeaturizer
+from time_series_Xy import TimeSeriesXy
 
 
 class TimeSeriesForecaster:
@@ -67,17 +64,6 @@ class TimeSeriesForecaster:
         FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
     )  # 1 month
     OPTUNA_TRIALS = 100
-    AR_FROM_Y = True  # Autoregressive features from y
-    AR_FROM_WEATHER_DATA = False  # Autoregressive features from weather data
-    LAGS = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
-    )  # Number of lags to use for autoregressive features; 1 week
-    MAX_LAGS = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
-    )  # Maximum number of lags to use for autoregressive features; 1 week
-    FORECAST_HORIZON = (
-        FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
-    )  # Number of steps to forecast; 1 day
     HPO_FLAG = False  # Flag to enable hyperparameter optimization
     CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
 
@@ -108,27 +94,6 @@ class TimeSeriesForecaster:
             "learning_rate": optuna.distributions.FloatDistribution(0.01, 0.3),
         },
     }
-
-    def __init__(
-        self, y_data: pd.DataFrame, weather_data: Optional[pd.DataFrame] = None
-    ) -> None:
-        """
-        Constructs all the necessary attributes for the TimeSeriesRegression object.
-
-        Parameters
-        ----------
-        y_data : pd.DataFrame
-            Time series data.
-        weather_data : str
-            Exogenous weather data.
-        """
-        self.y_data = y_data
-        self.weather_data = weather_data
-
-        if self.y_data is None:
-            raise ValueError(
-                "y_data and must be specified before calling simulate_production()."
-            )
 
     def _log_shap_values(self, model, X_train, artifact_name):
         # Calculate SHAP values
@@ -184,81 +149,10 @@ class TimeSeriesForecaster:
             )
         return cv
 
-    def _create_regression_data(
-        self,
-        df: pd.DataFrame,
-        target_variable: str,
-        fh: int = FORECAST_HORIZON,
-    ) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
-
-        Parameters
-        ----------
-        df: pd.DataFrame
-            DataFrame with a DateTime index, containing both y and optional weather data.
-        target_variable: str
-            Name of the target (y) variable.
-        fh : int
-            Forecast horizon.
-
-        Returns
-        -------
-        X : pd.DataFrame
-            DataFrame ready for regression, with optional weather data and (if requested) autoregressive features.
-        y : pd.DataFrame
-            DataFrame with the target variable.
-        """
-        # Create X and y
-        X = df.drop(columns=target_variable)
-        y = df[target_variable].shift(-(fh - 1)).dropna()
-
-        # Drop NaN values from y and corresponding rows from X
-        nan_rows = y.isna()
-        y = y.dropna()
-        X = X.loc[~nan_rows]
-
-        return X, y
-
-    def df_to_X_y(
-        self, df: pd.DataFrame, target_variable: str
-    ) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
-
-        Parameters
-        ----------
-        df: pd.DataFrame
-            DataFrame with a DateTime index, containing both y and optional weather data.
-        target_variable: str
-            Name of the target (y) variable.
-
-        Returns
-        -------
-        X : pd.DataFrame
-            DataFrame ready for regression, with optional weather data and (if requested) autoregressive features.
-        y : pd.Series
-            Series with the target variable.
-        """
-        # Create features
-        df, _ = TimeSeriesFeaturizer.create_features(
-            df,
-            target_variable,
-            ar_from_y=self.AR_FROM_Y,
-            ar_from_weather_data=self.AR_FROM_WEATHER_DATA,
-            lags=self.LAGS,
-            max_lags=self.MAX_LAGS,
-            use_pacf=False,  # for multi-step forecasting, use_pacf must be False
-        )
-        # Create X and y
-        X, y = self._create_regression_data(
-            df, target_variable, self.FORECAST_HORIZON
-        )
-        return X, y
-
     def _objective(
         self,
         trial,
+        cv: BaseWindowSplitter,
         df: pd.DataFrame,
         target_variable: str,
         model_name: str,
@@ -307,8 +201,6 @@ class TimeSeriesForecaster:
         # Create the model
         model_class = self.model_mapping[model_name]
         model = model_class(**params)
-        # Create the cross-validator
-        cv = self._create_cross_validator()
         # Initialize the scores list
         scores = []
 
@@ -317,8 +209,8 @@ class TimeSeriesForecaster:
             # Split the data
             train, test = df.iloc[train_index], df.iloc[test_index]
             # Create X and y
-            X_train, y_train = self.df_to_X_y(train, target_variable)
-            X_test, y_test = self.df_to_X_y(test, target_variable)
+            X_train, y_train = TimeSeriesXy().df_to_X_y(train, target_variable)
+            X_test, y_test = TimeSeriesXy().df_to_X_y(test, target_variable)
             # Convert to numpy arrays
             X_train, y_train = X_train.to_numpy(), y_train.to_numpy()
             X_test, y_test = X_test.to_numpy(), y_test.to_numpy()
@@ -373,7 +265,7 @@ class TimeSeriesForecaster:
             )
 
         # Initialize cross-validator
-        # cv = self._create_cross_validator(cv_strategy)
+        cv = self._create_cross_validator(cv_strategy)
 
         y_true_all, y_pred_all, indices_all = [], [], []
 
@@ -396,6 +288,7 @@ class TimeSeriesForecaster:
             study.optimize(
                 partial(
                     self._objective,
+                    cv=cv,
                     df=df,
                     target_variable=target_variable,
                     model_name=model_name,
@@ -414,7 +307,7 @@ class TimeSeriesForecaster:
 
         model_class = self.model_mapping[model_name]
         model = model_class(**best_params)
-        X_train, y_train = self.df_to_X_y(df, target_variable)
+        X_train, y_train = TimeSeriesXy().df_to_X_y(df, target_variable)
         model.fit(X_train, y_train)
 
         # Log model

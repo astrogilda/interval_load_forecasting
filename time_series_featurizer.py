@@ -45,17 +45,17 @@ class TimeSeriesFeaturizer:
 
         # Extract calendar features from the index
         df["month"] = (
-            (df.index.month + 1) / 12 if normalize else df.index.month
+            df.index.month / (12 - 1) if normalize else df.index.month
         )
         df["dayofmonth"] = df.index.day / 31 if normalize else df.index.day
         df["dayofweek"] = (
-            (df.index.dayofweek + 1) / 7 if normalize else df.index.dayofweek
+            df.index.dayofweek / (7 - 1) if normalize else df.index.dayofweek
         )
         df["hourofday"] = (
-            (df.index.hour + 1) / 24 if normalize else df.index.hour
+            df.index.hour / (24 - 1) if normalize else df.index.hour
         )
         df["minuteofhour"] = (
-            (df.index.minute + 1) / 60 if normalize else df.index.minute
+            df.index.minute / (60 - 1) if normalize else df.index.minute
         )
 
         return df

@@ -7,9 +7,6 @@ from pandas.plotting import autocorrelation_plot
 from statsmodels.graphics.tsaplots import plot_pacf
 from statsmodels.tsa.seasonal import MSTL
 
-# Default figure size for plots
-# FIGSIZE = (16, 8)
-
 # Define the settings for high-quality plots
 plot_settings = {
     "figure.figsize": (14, 8),  # Figure size
