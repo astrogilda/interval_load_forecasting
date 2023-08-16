@@ -7,28 +7,21 @@ import optuna
 import pandas as pd
 import shap
 from matplotlib import pyplot as plt
-from numpy.typing import ArrayLike
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Ridge
-from sklearn.metrics import (
-    mean_absolute_error,
-    mean_absolute_percentage_error,
-    mean_squared_error,
-)
 from sktime.forecasting.model_selection import (
     ExpandingWindowSplitter,
     SlidingWindowSplitter,
 )
 from sktime.forecasting.model_selection._split import BaseWindowSplitter
-from sktime.utils.plotting import plot_series
-from xgboost import XGBRegressor
 
 from common_constants import (
     CV_STRATEGY,
     HPO_FLAG,
     INITIAL_WINDOW_LENGTH,
     METRIC_NAME,
+    MODEL_MAPPING,
     MODEL_NAME,
+    MODEL_SPACES,
+    OBJECTIVE_METRICS,
     OPTUNA_TRIALS,
     STEP_LENGTH,
     TARGET_VARIABLE,
@@ -59,34 +52,6 @@ class TimeSeriesTrainer:
     model_mapping : dict
         Model names to model classes mapping.
     """
-
-    # Define metrics for Optuna objective function
-    objective_metrics = {
-        "mae": mean_absolute_error,
-        "mse": mean_squared_error,
-        "mape": mean_absolute_percentage_error,
-    }
-
-    # Define model mapping
-    model_mapping = {
-        "rr": Ridge,
-        "rf": RandomForestRegressor,
-        "xgb": XGBRegressor,
-    }
-
-    # Define model hyperparameter spaces
-    model_spaces = {
-        "rr": {"alpha": optuna.distributions.FloatDistribution(0.0, 1.0)},
-        "rf": {
-            "n_estimators": optuna.distributions.IntDistribution(2, 150),
-            "max_depth": optuna.distributions.IntDistribution(1, 32),
-        },
-        "xgb": {
-            "n_estimators": optuna.distributions.IntDistribution(2, 150),
-            "max_depth": optuna.distributions.IntDistribution(1, 10),
-            "learning_rate": optuna.distributions.FloatDistribution(0.01, 0.3),
-        },
-    }
 
     def _log_shap_values(self, model, X_train, run_id: str):
         """
@@ -192,7 +157,7 @@ class TimeSeriesTrainer:
             Metric value.
         """
         # Define hyperparameters to be optimized based on the model name
-        hyperparameter_space = self.model_spaces[model_name]
+        hyperparameter_space = MODEL_SPACES[model_name]
         params = {}
         for param_name, distribution in hyperparameter_space.items():
             if isinstance(
@@ -209,9 +174,9 @@ class TimeSeriesTrainer:
                 )
 
         # Get the metric function from the dictionary
-        metric_func = self.objective_metrics[metric_name]
+        metric_func = OBJECTIVE_METRICS[metric_name]
         # Create the model
-        model_class = self.model_mapping[model_name]
+        model_class = MODEL_MAPPING[model_name]
         model = model_class(**params)
         # Initialize the scores list
         scores = []
@@ -276,14 +241,14 @@ class TimeSeriesTrainer:
         model : object
             Trained model object.
         """
-        if model_name not in self.model_mapping:
+        if model_name not in MODEL_MAPPING:
             raise ValueError(
-                f"model_name must be one of: {list(self.model_mapping.keys())}"
+                f"model_name must be one of: {list(MODEL_MAPPING.keys())}"
             )
 
-        if metric_name not in self.objective_metrics:
+        if metric_name not in OBJECTIVE_METRICS:
             raise ValueError(
-                f"metric_name must be one of: {list(self.objective_metrics.keys())}"
+                f"metric_name must be one of: {list(OBJECTIVE_METRICS.keys())}"
             )
 
         # Initialize cross-validator
@@ -326,7 +291,7 @@ class TimeSeriesTrainer:
             mlflow.log_params(best_params)
             mlflow.log_metric("best_hpo_score", best_score)
 
-        model_class = self.model_mapping[model_name]
+        model_class = MODEL_MAPPING[model_name]
         model = model_class(**best_params)
         X_train, y_train = TimeSeriesXy().df_to_X_y(df, target_variable)
         model.fit(X_train.to_numpy(), y_train.to_numpy())
@@ -341,50 +306,3 @@ class TimeSeriesTrainer:
         mlflow.end_run()
 
         return model
-
-        """
-        y_pred = model.predict(X_test.to_numpy())
-        mae = mean_absolute_error(y_test, y_pred)
-
-        # Log metrics
-        mlflow.log_metric("mae", mae)
-
-        # Log SHAP values
-        self._log_shap_values(model, X_train, f"shap_{model_name}")
-
-        y_true_all.extend(list(y_test))
-        y_pred_all.extend(list(y_pred))
-        indices_all.extend(list(X_test.index))
-
-        mae = mean_absolute_error(y_true_all, y_pred_all)
-        print(f"Mean Absolute Error: {mae}")
-
-        # Log overall metrics
-        mlflow.log_metric("overall_mae", mae)
-
-        # Save the best model (optional)
-        mlflow.sklearn.save_model(model, "best_model")
-
-        # Add tags or notes (optional)
-        mlflow.set_tags(
-            {
-                "description": "Time series forecasting with walk-forward validation"
-            }
-        )
-
-        mlflow.end_run()
-
-        plot_series(
-            pd.Series(y_true_all, name="y_true"),
-            pd.Series(y_pred_all, name="y_pred"),
-        )
-
-        # return pd.Series(y_true_all, name='y_true'), pd.Series(y_pred_all, name='y_pred')
-
-        # Combine actual and predicted values into a DataFrame
-        df_results = pd.DataFrame(
-            {"actual": y_true_all, "predicted": y_pred_all}
-        )
-        df_results.index = indices_all
-        return df_results
-        """

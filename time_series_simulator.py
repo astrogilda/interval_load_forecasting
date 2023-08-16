@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Tuple
 
+import mlflow
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -10,6 +11,8 @@ from common_constants import (
     FORECAST_HORIZON,
     INITIAL_TRAIN_LENGTH,
     LAGS,
+    METRIC_NAME,
+    OBJECTIVE_METRICS,
     TARGET_VARIABLE,
     TEST_LENGTH,
 )
@@ -20,11 +23,6 @@ from time_series_xy import TimeSeriesXy
 class TimeSeriesSimulator:
     """
     Simulates a production environment where new data comes in steps.
-
-    Attributes
-    ----------
-    STEP_LENGTH : int
-        Number of steps to take between each iteration in the walk-forward validation.
     """
 
     def __init__(self, df: pd.DataFrame) -> None:
@@ -49,6 +47,7 @@ class TimeSeriesSimulator:
         self,
         initial_size: int = INITIAL_TRAIN_LENGTH,
         test_length: int = TEST_LENGTH,
+        metric_name: str = METRIC_NAME,
     ) -> None:
         """
         Simulates a production environment where new data comes in steps.
@@ -57,7 +56,7 @@ class TimeSeriesSimulator:
         ----------
         initial_size : int
             Initial size of the data.
-        steps : int
+        test_length : int
             Number of steps to simulate in the production environment. This determines how many iterations the simulation will run.
         """
         y_true_all, y_pred_all, indices_all = [], [], []
@@ -83,56 +82,67 @@ class TimeSeriesSimulator:
                 df_test, TARGET_VARIABLE, trained_model
             )
 
-            self.save_simulation_results(df_results, f"results_step_{i}.csv")
+            # Update simulation results
+            self.update_simulation_results(
+                metric_name,
+                y_test,
+                y_test_pred,
+                y_true_all,
+                y_pred_all,
+                indices_all,
+            )
 
-            self.plot_simulation_results(f"results_step_{i}.csv")
             # Update i
             i = i + LAGS + FORECAST_HORIZON
 
-    def update_simulation_results(self):
+    def update_simulation_results(
+        self,
+        metric_name,
+        y_test,
+        y_test_pred,
+        y_true_all,
+        y_pred_all,
+        indices_all,
+    ):
         """
-        y_pred = model.predict(X_test.to_numpy())
-        mae = mean_absolute_error(y_test, y_pred).
+        Update simulation results and log metrics.
 
-        # Log metrics
-        mlflow.log_metric("mae", mae)
+        Parameters
+        ----------
+        y_test : ArrayLike
+            Actual values.
+        y_test_pred : ArrayLike
+            Predicted values.
+        y_true_all : list
+            List of all true values.
+        y_pred_all : list
+            List of all predicted values.
+        indices_all : list
+            List of indices.
+        """
+        metric_func = OBJECTIVE_METRICS[metric_name]
+
+        score = metric_func(y_test, y_test_pred)
+        # Log metrics for this simulation run
+        with mlflow.start_run(run_name="simulation_run", nested=True):
+            mlflow.log_metric(f"{metric_name}_score", score)
 
         y_true_all.extend(list(y_test))
-        y_pred_all.extend(list(y_pred))
+        y_pred_all.extend(list(y_test_pred))
         indices_all.extend(list(y_test.index))
 
-        mae = mean_absolute_error(y_true_all, y_pred_all)
-        print(f"Mean Absolute Error: {mae}")
+        overall_score = metric_func(y_true_all, y_pred_all)
 
         # Log overall metrics
-        mlflow.log_metric("overall_mae", mae)
-
-        # Save the best model (optional)
-        mlflow.sklearn.save_model(model, "best_model")
-
-        # Add tags or notes (optional)
-        mlflow.set_tags(
-            {
-                "description": "Time series forecasting with walk-forward validation"
-            }
-        )
-
-        mlflow.end_run()
-
-        plot_series(
-            pd.Series(y_true_all, name="y_true"),
-            pd.Series(y_pred_all, name="y_pred"),
-        )
-
-        # return pd.Series(y_true_all, name='y_true'), pd.Series(y_pred_all, name='y_pred')
+        mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
 
         # Combine actual and predicted values into a DataFrame
         df_results = pd.DataFrame(
             {"actual": y_true_all, "predicted": y_pred_all}
         )
         df_results.index = indices_all
+
         return df_results
-        """
 
     def save_simulation_results(
         self, df_results: pd.DataFrame, filename: str, folder: str = "results"

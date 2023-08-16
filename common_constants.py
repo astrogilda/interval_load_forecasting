@@ -1,3 +1,13 @@
+import optuna
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+)
+from xgboost import XGBRegressor
+
 from time_constants import (
     DAYS_PER_MONTH,
     DAYS_PER_WEEK,
@@ -46,6 +56,33 @@ MODEL_NAME = (
     "rr"  # Model name. Must be one of: "rr", "xgb", "lgbm", "rf", "mlp"
 )
 METRIC_NAME = "mae"  # Metric name. Must be one of: "mae", "mse", "rmse", "rmsle", "mape", "smape", "r2", "corr"
+
+# Define metrics for Optuna objective function
+OBJECTIVE_METRICS = {
+    "mae": mean_absolute_error,
+    "mse": mean_squared_error,
+    "mape": mean_absolute_percentage_error,
+}
+# Define model hyperparameter spaces
+MODEL_SPACES = {
+    "rr": {"alpha": optuna.distributions.FloatDistribution(0.0, 1.0)},
+    "rf": {
+        "n_estimators": optuna.distributions.IntDistribution(2, 150),
+        "max_depth": optuna.distributions.IntDistribution(1, 32),
+    },
+    "xgb": {
+        "n_estimators": optuna.distributions.IntDistribution(2, 150),
+        "max_depth": optuna.distributions.IntDistribution(1, 10),
+        "learning_rate": optuna.distributions.FloatDistribution(0.01, 0.3),
+    },
+}
+# Define model mapping
+MODEL_MAPPING = {
+    "rr": Ridge,
+    "rf": RandomForestRegressor,
+    "xgb": XGBRegressor,
+}
+
 
 # For simulating production
 INITIAL_TRAIN_LENGTH = (
