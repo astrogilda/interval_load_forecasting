@@ -161,7 +161,7 @@ class TimeSeriesPreprocessor:
 
     @staticmethod
     def _align_timestamps(
-        *dfs: Optional[Union[pd.DataFrame, pd.Series]]
+        *dfs: Optional[Union[pd.DataFrame, pd.Series]], use_union: bool = False
     ) -> Union[
         Optional[Union[pd.DataFrame, pd.Series]],
         Tuple[Optional[Union[pd.DataFrame, pd.Series]]],
@@ -173,6 +173,8 @@ class TimeSeriesPreprocessor:
         ----------
         dfs : tuple of Optional[Union[pd.DataFrame, pd.Series]]
             One or more pandas DataFrames or Series with timestamps as index, or None.
+        use_union : bool, optional
+            If True, aligns the dataframes using the union of indices. If False (default), aligns using the intersection.
 
         Returns
         -------
@@ -190,14 +192,14 @@ class TimeSeriesPreprocessor:
         # Find common index across all non-None DataFrames or Series
         common_index = non_none_dfs[0].index
         for df in non_none_dfs[1:]:
-            common_index = common_index.intersection(df.index)
+            if use_union:
+                common_index = common_index.union(df.index)
+            else:
+                common_index = common_index.intersection(df.index)
 
-        # Reindex and forward fill missing values
+        # Reindex and let NaNs propagate forward
         output_dfs = [
-            df.reindex(common_index, method="ffill")
-            if df is not None
-            else None
-            for df in dfs
+            df.reindex(common_index) if df is not None else None for df in dfs
         ]
 
         if len(output_dfs) == 1:
@@ -205,7 +207,9 @@ class TimeSeriesPreprocessor:
         else:
             return tuple(output_dfs)
 
-    def merge_y_and_weather_data(self) -> Union[pd.DataFrame, pd.Series]:
+    def merge_y_and_weather_data(
+        self, freq: Optional[str] = None, use_union: bool = False
+    ) -> Union[pd.DataFrame, pd.Series]:
         """
         Merges y_data and weather_data.
 
@@ -214,22 +218,22 @@ class TimeSeriesPreprocessor:
         merged_data : pd.DataFrame
             Merged DataFrame.
         """
-        self.y_data, self.weather_data = self._handle_duplicate_indices(
-            self.y_data, self.weather_data
+        self.y_data, self.weather_data = self._handle_duplicate_indices(  # type: ignore
+            self.y_data, self.weather_data  # type: ignore
         )
-        self.y_data, self.weather_data = self._handle_missing_indices(
-            self.y_data, self.weather_data
+        self.y_data, self.weather_data = self._handle_missing_indices(  # type: ignore
+            self.y_data, self.weather_data, freq=freq  # type: ignore
         )
-        self.y_data, self.weather_data = self._align_timestamps(
-            self.y_data, self.weather_data
+        self.y_data, self.weather_data = self._align_timestamps(  # type: ignore
+            self.y_data, self.weather_data, use_union=use_union  # type: ignore
         )
 
         if self.weather_data is None:
-            return self.y_data
+            return self.y_data  # type: ignore
         else:
             return pd.merge(
-                self.y_data,
-                self.weather_data,
+                self.y_data,  # type: ignore
+                self.weather_data,  # type: ignore
                 left_index=True,
                 right_index=True,
                 how="inner",
