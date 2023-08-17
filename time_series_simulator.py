@@ -267,13 +267,21 @@ class TimeSeriesSimulator:
 
         for column in df_actual.columns:
             plt.close("all")
-            plt.scatter(df_actual[column], df_pred[column], alpha=0.5, color="blue", label=f"Actual vs. Predicted {column}")
+            plt.scatter(
+                df_actual[column],
+                df_pred[column],
+                alpha=0.5,
+                color="blue",
+                label=f"Actual vs. Predicted {column}",
+            )
             plt.plot(
-            [df_actual[column].min(), df_actual[column].max()],
-            [df_actual[column].min(), df_actual[column].max()],
-            "white", ls="--", lw=1,
-            label="Perfect Fit",
-        )
+                [df_actual[column].min(), df_actual[column].max()],
+                [df_actual[column].min(), df_actual[column].max()],
+                "white",
+                ls="--",
+                lw=1,
+                label="Perfect Fit",
+            )
             plt.xlabel("True Load", fontsize=15)
             plt.ylabel("Predicted Load", fontsize=15)
             plt.legend()
@@ -284,7 +292,6 @@ class TimeSeriesSimulator:
                 bbox_inches="tight",
                 pad_inches=0.1,
             )
-
 
         # Histogram of mean residuals
         plt.close("all")

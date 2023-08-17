@@ -69,14 +69,6 @@ class TimeSeriesLoader:
         # Convert the index to datetime type
         data.index = pd.to_datetime(data.index)
 
-        # Compute the differences between consecutive timestamps
-        deltas = data.index.to_series().diff().value_counts().index
-        # Take the most common difference as the inferred frequency
-        inferred_freq = deltas[0] if len(deltas) > 0 else None
-        # Create a new index with the inferred frequency
-        if inferred_freq:
-            data = data.asfreq(inferred_freq)
-
         # Check if data is a pd.DataFrame
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")

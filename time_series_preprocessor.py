@@ -214,10 +214,10 @@ class TimeSeriesPreprocessor:
         merged_data : pd.DataFrame
             Merged DataFrame.
         """
-        self.y_data, self.weather_data = self._handle_missing_indices(
+        self.y_data, self.weather_data = self._handle_duplicate_indices(
             self.y_data, self.weather_data
         )
-        self.y_data, self.weather_data = self._handle_duplicate_indices(
+        self.y_data, self.weather_data = self._handle_missing_indices(
             self.y_data, self.weather_data
         )
         self.y_data, self.weather_data = self._align_timestamps(
