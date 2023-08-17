@@ -134,6 +134,9 @@ class TimeSeriesFeaturizer:
         if not isinstance(df.index, pd.DatetimeIndex):
             raise TypeError("Index must be a DateTimeIndex")
 
+        # Don't modify the original DataFrame
+        df = df.copy()
+
         # Create calendar features
         df = TimeSeriesFeaturizer.create_calendar_features(df)
 
@@ -151,8 +154,8 @@ class TimeSeriesFeaturizer:
             else:
                 best_lag_y = lags
 
-            for i in range(1, best_lag_y + 1):
-                new_columns[f"y_lag_{i}"] = y.shift(i)
+            for i in range(best_lag_y):
+                new_columns[f"y_lag_{i+1}"] = y.shift(i)
 
         # If autoregressive features from weather_data are requested, add them
         weather_data = df.drop(columns=target_variable)

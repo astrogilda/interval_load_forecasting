@@ -65,7 +65,7 @@ class TimeSeriesXy:
         # Add future values of y
         y_columns = {}
         for i in range(1, fh + 1):
-            y_columns[f"y_fh_{i}"] = df[target_variable].shift(i)
+            y_columns[f"y_fh_{i}"] = df[target_variable].shift(-i)
 
         y = pd.DataFrame(y_columns)
 
@@ -77,7 +77,7 @@ class TimeSeriesXy:
 
     @staticmethod
     def df_to_X_y(
-        df: pd.DataFrame, target_variable: str
+        df: pd.DataFrame, target_variable: str, fh: int = FORECAST_HORIZON
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
@@ -107,7 +107,5 @@ class TimeSeriesXy:
             use_pacf=False,  # for multi-step forecasting, use_pacf must be False
         )
         # Create X and y
-        X, y = TimeSeriesXy._create_regression_data(
-            df, target_variable, FORECAST_HORIZON
-        )
+        X, y = TimeSeriesXy._create_regression_data(df, target_variable, fh)
         return X, y

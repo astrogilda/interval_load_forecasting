@@ -5,7 +5,6 @@ import mlflow
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
-from numpy.typing import ArrayLike
 
 from common_constants import (
     FORECAST_HORIZON,
@@ -76,6 +75,24 @@ class TimeSeriesSimulator:
 
         return y_test, y_test_pred
 
+    @staticmethod
+    def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Removes duplicates from a DataFrame.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame to remove duplicates from.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with duplicates removed.
+        """
+        df = df.loc[~df.index.duplicated(keep="first")]
+        return df
+
     def simulate_production(
         self,
         initial_size: int = INITIAL_TRAIN_LENGTH,
@@ -127,11 +144,29 @@ class TimeSeriesSimulator:
             # Update i
             i = i + LAGS + FORECAST_HORIZON
 
+        # Remove duplicates
+        self.df_test = TimeSeriesSimulator.remove_duplicates(self.df_test)
+        self.df_test_pred = TimeSeriesSimulator.remove_duplicates(
+            self.df_test_pred
+        )
+
         metric_func = OBJECTIVE_METRICS[metric_name]
         overall_score = metric_func(self.df_test, self.df_test_pred)
 
         # Log overall metrics
         mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
+
+        # Save simulation results
+        self.save_simulation_results(
+            self.df_test, "actual.csv", folder="results"
+        )
+        self.save_simulation_results(
+            self.df_test_pred, "predicted.csv", folder="results"
+        )
+
+        # Plot simulation results
+        # self.plot_simulation_results("actual.csv", folder="results")
+        # self.plot_simulation_results("predicted.csv", folder="results")
 
     def update_simulation_results(
         self,
@@ -184,8 +219,11 @@ class TimeSeriesSimulator:
         # Save the DataFrame to a CSV file
         df_results.to_csv(Path(folder) / filename)
 
+    @staticmethod
     def plot_simulation_results(
-        self, filename: str, folder: str = "results"
+        filename_pred: str = "actual.csv",
+        filename_actual: str = "predicted.csv",
+        folder: str = "results",
     ) -> None:
         """
         Plots the simulation results (actual and predicted values).
@@ -198,8 +236,10 @@ class TimeSeriesSimulator:
             Name of the folder containing the results.
         """
         # Load the results from the CSV file
-        df_results = pd.read_csv(Path(folder) / filename, index_col=0)
+        df_actual = pd.read_csv(Path(folder) / filename_actual, index_col=0)
+        df_pred = pd.read_csv(Path(folder) / filename_pred, index_col=0)
 
+        """
         # Line plot of actual and predicted values
         plt.close("all")
         df_results.plot(
@@ -214,55 +254,81 @@ class TimeSeriesSimulator:
             bbox_inches="tight",
             pad_inches=0.1,
         )
+        """
 
         # Calculate residuals (actual - predicted)
-        df_results["residuals"] = (
-            df_results["actual"] - df_results["predicted"]
-        )
-
-        print(type(df_results))
+        df_residuals = df_actual - df_pred
 
         # Add necessary time attributes
-        df_results.index = pd.to_datetime(df_results.index)
-        df_results["hour"] = df_results.index.hour.values
-        df_results["day"] = df_results.index.dayofweek.values
-        df_results["month"] = df_results.index.month.values
+        df_residuals.index = pd.to_datetime(df_residuals.index)
+        df_residuals["hour"] = df_residuals.index.hour.values
+        df_residuals["day"] = df_residuals.index.dayofweek.values
+        df_residuals["month"] = df_residuals.index.month.values
 
-        # Scatter plot of residuals vs. hour of day
-        plt.close("all")
-        # plt.figure(figsize=FIGSIZE)
-        plt.scatter(df_results["actual"], df_results["predicted"], alpha=0.5)
-        plt.plot(
-            [df_results["actual"].min(), df_results["actual"].max()],
-            [df_results["actual"].min(), df_results["actual"].max()],
-            "k--",
+        for column in df_actual.columns:
+            plt.close("all")
+            plt.scatter(df_actual[column], df_pred[column], alpha=0.5, color="blue", label=f"Actual vs. Predicted {column}")
+            plt.plot(
+            [df_actual[column].min(), df_actual[column].max()],
+            [df_actual[column].min(), df_actual[column].max()],
+            "white", ls="--", lw=1,
             label="Perfect Fit",
         )
-        plt.xlabel("True Load", fontsize=15)
-        plt.ylabel("Predicted Load", fontsize=15)
-        plt.legend()
-        plt.title("Actual vs. Predicted Load", fontsize=20)
-        plt.savefig(
-            "pred_vs_true_scatterplot.png",
-            dpi=300,
-            bbox_inches="tight",
-            pad_inches=0.1,
-        )
+            plt.xlabel("True Load", fontsize=15)
+            plt.ylabel("Predicted Load", fontsize=15)
+            plt.legend()
+            plt.title(f"Actual vs. Predicted {column}", fontsize=20)
+            plt.savefig(
+                f"figures/actual_vs_predicted_{column}_scatterplot.png",
+                dpi=300,
+                bbox_inches="tight",
+                pad_inches=0.1,
+            )
 
-        # Histogram of residuals
+
+        # Histogram of mean residuals
         plt.close("all")
         # plt.figure(figsize=FIGSIZE)
-        df_results["residuals"].hist(bins=30, edgecolor="k")
+        df_residuals.mean(axis=1).hist(bins=30, edgecolor="k")
         plt.xlabel("Residual", fontsize=15)
         plt.ylabel("Frequency", fontsize=15)
-        plt.title("Histogram of Residuals", fontsize=20)
+        plt.title("Histogram of Mean Residuals", fontsize=20)
         plt.savefig(
-            "residuals_histogram.png",
+            "figures/residuals_histogram_mean.png",
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
         )
 
+        # Histogram of .95 quantile residuals
+        plt.close("all")
+        # plt.figure(figsize=FIGSIZE)
+        df_residuals.quantile(0.95, axis=1).hist(bins=30, edgecolor="k")
+        plt.xlabel("Residual", fontsize=15)
+        plt.ylabel("Frequency", fontsize=15)
+        plt.title("Histogram of max Residuals", fontsize=20)
+        plt.savefig(
+            "figures/residuals_histogram_p95quantile.png",
+            dpi=300,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
+
+        # Histogram of .05 quantile residuals
+        plt.close("all")
+        # plt.figure(figsize=FIGSIZE)
+        df_residuals.quantile(0.05, axis=1).hist(bins=30, edgecolor="k")
+        plt.xlabel("Residual", fontsize=15)
+        plt.ylabel("Frequency", fontsize=15)
+        plt.title("Histogram of min Residuals", fontsize=20)
+        plt.savefig(
+            "figures/residuals_histogram_p05quantile.png",
+            dpi=300,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
+
+        """
         # Line plot of residuals over time
         plt.close("all")
         # plt.figure(figsize=FIGSIZE)
@@ -282,15 +348,17 @@ class TimeSeriesSimulator:
             bbox_inches="tight",
             pad_inches=0.1,
         )
+        """
 
         # Group by hour and day and calculate mean residuals
+        df_residuals["mean_residuals"] = df_residuals.mean(axis=1)
         grouped = (
-            df_results.groupby(["hour", "day"])["residuals"]
+            df_residuals.groupby(["hour", "day"])["mean_residuals"]
             .mean()
             .reset_index()
         )
         grouped = grouped.pivot(
-            index="hour", columns="day", values="residuals"
+            index="hour", columns="day", values="mean_residuals"
         )
 
         plt.close("all")
@@ -300,7 +368,7 @@ class TimeSeriesSimulator:
         plt.xlabel("Day of Week", fontsize=15)
         plt.ylabel("Hour of Day", fontsize=15)
         plt.savefig(
-            "residuals_heatmap.png",
+            "figures/residuals_heatmap.png",
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,

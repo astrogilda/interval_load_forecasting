@@ -4,10 +4,11 @@ venv/
 *cache
 __pycache__/
 mlruns/
+figures_copy/
 DS_Forecasting_Take_Home_2023.ipynb
 
 # Temporary
-figures/
+/
 results/
 EDA.py
 

@@ -10,6 +10,7 @@ from time_series_loader import TimeSeriesLoader
 from time_series_preprocessor import TimeSeriesPreprocessor
 from time_series_simulator import TimeSeriesSimulator
 from time_series_trainer import TimeSeriesTrainer
+from time_series_xy import TimeSeriesXy
 
 # Load data
 data_loader = TimeSeriesLoader(y_file="data/load.csv")
@@ -24,14 +25,20 @@ preprocessor = TimeSeriesPreprocessor(y_data, weather_data)
 df = preprocessor.merge_y_and_weather_data()
 
 # Simulate production
-simulator = TimeSeriesSimulator(df)
-simulator.simulate_production()
+#simulator = TimeSeriesSimulator(df)
+#simulator.simulate_production()
 
+# Plot simulated production
+TimeSeriesSimulator.plot_simulation_results(
+    filename_actual="actual.csv", filename_pred="predicted.csv"
+)
+
+
+
+
+"""
 # Prepare data
-# featurizer = TimeSeriesFeaturizer()
-# df, max_lags = featurizer.create_features(
-#    y_data, "Load", use_pacf=False, max_lags=96 * 7, lags=96
-# )
+X, y = TimeSeriesXy.df_to_X_y(df, "Load")
 
 df_train, df_test = df.iloc[: -96 * 30 * 3], df.iloc[-96 * 30 * 3 :]
 
@@ -55,7 +62,6 @@ for train_index, test_index in cv.split(df):
     print(f"TEST: {test_index}")
     print("")
 
-"""
 # Preprocess data
 X_train, y_train, X_test, y_test = data_loader.preprocess_data(
     y_data, weather_data

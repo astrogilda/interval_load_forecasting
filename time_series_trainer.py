@@ -258,7 +258,7 @@ class TimeSeriesTrainer:
         cv = self._create_cross_validator(cv_strategy)
 
         mlflow.start_run(run_name=f"{model_name}_training")
-        run_id = mlflow.active_run().info.run_id
+        mlflow.active_run().info.run_id
         # Log some basic information
         mlflow.log_params(
             {
