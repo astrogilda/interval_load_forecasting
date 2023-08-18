@@ -39,7 +39,7 @@ class TimeSeriesTrainer:
     Time series regression class.
     """
 
-    def _log_shap_values(self, model, X_train, run_id: str):
+    def _calculate_and_log_shap_values(self, model, X_train, run_id: str):
         """
         Log SHAP values as artifacts.
 
@@ -59,17 +59,27 @@ class TimeSeriesTrainer:
         shap_values = explainer(X_train)
         print(f"shap_values.shape: {shap_values.shape}")
 
-        # Log SHAP values as a plot
-        shap_plot_path = f"shap_summary_{run_id}.png"
-        shap.summary_plot(shap_values, X_train, show=False)
-        plt.savefig(shap_plot_path)
-        mlflow.log_artifact(shap_plot_path)
+        for step in range(
+            shap_values.shape[2]
+        ):  # Iterate over each forecast step
+            # Isolate SHAP values for this step
+            shap_values_step = shap_values[:, :, step]
+            # Log SHAP values as a plot for this step
+            shap_plot_path = f"shap_summary_step_{step}_{run_id}.png"
+            shap.summary_plot(shap_values_step, X_train, show=False)
+            plt.savefig(shap_plot_path)
+            # Save SHAP values as a DataFrame
+            shap_df_path = f"shap_summary_step_{step}_{run_id}.csv"
+            shap_df = pd.DataFrame(
+                shap_values_step.values, columns=X_train.columns
+            )
+            shap_df.to_csv(shap_df_path)
 
-        # Log SHAP values as a DataFrame (optional)
-        shap_df_path = f"shap_values_{run_id}.csv"
-        shap_df = pd.DataFrame(shap_values.values, columns=X_train.columns)
-        shap_df.to_csv(shap_df_path)
-        mlflow.log_artifact(shap_df_path)
+            if mlflow.active_run():
+                # Log SHAP values as an artifact
+                mlflow.log_artifact(shap_df_path)
+                # Log SHAP values as a plot
+                mlflow.log_artifact(shap_plot_path)
 
     def _create_cross_validator(
         self, cv_strategy: str = CV_STRATEGY
@@ -208,9 +218,9 @@ class TimeSeriesTrainer:
                 run_name=f"{model_name}_trial_{trial.number}", nested=True
             ):
                 mlflow.log_params(params)
-                mlflow.log_metric(metric_name, mean_score)
+                mlflow.log_metric(metric_name, mean_score)  # type: ignore
 
-        return mean_score
+        return mean_score  # type: ignore
 
     def train(
         self,
@@ -261,7 +271,7 @@ class TimeSeriesTrainer:
         if mlflow_logging_flag:
             # Start the run
             mlflow.start_run(run_name=f"{model_name}_training")
-            run_id = mlflow.active_run().info.run_id
+            run_id = mlflow.active_run().info.run_id  # type: ignore
             # Log some basic information
             mlflow.log_params(
                 {
@@ -296,7 +306,7 @@ class TimeSeriesTrainer:
             best_params = study.best_params
             best_score = study.best_value
 
-            if mlflow_logging_flag:
+            if mlflow.active_run():
                 # Log parameters and metrics
                 mlflow.log_params(best_params)
                 mlflow.log_metric("best_hpo_score", best_score)
@@ -306,11 +316,12 @@ class TimeSeriesTrainer:
         X_train, y_train = TimeSeriesXy.df_to_X_y(df, target_variable)
         model.fit(X_train.to_numpy(), y_train.to_numpy())
 
-        if mlflow_logging_flag:
+        # Calculate and log SHAP values
+        self._calculate_and_log_shap_values(model, X_train, run_id)  # type: ignore
+
+        if mlflow.active_run():
             # Log model
             mlflow.sklearn.log_model(model, f"model_{model_name}")
-            # Calculate and log SHAP values
-            self._log_shap_values(model, X_train, run_id)
             # End the run
             mlflow.end_run()
 
