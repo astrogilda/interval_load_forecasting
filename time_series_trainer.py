@@ -82,7 +82,7 @@ class TimeSeriesTrainer:
         cv_strategy : str
             Cross-validation strategy. Must be one of: "rolling", "expanding".
         step_length : int
-            Number of steps to take between each iteration in the walk-forward validation.
+            Number of steps to take between each iteration during validation.
         fh : Union[list[int], np.ndarray]
             Forecast horizon.
 
