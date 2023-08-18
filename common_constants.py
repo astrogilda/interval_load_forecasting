@@ -1,3 +1,5 @@
+import multiprocessing as mp
+
 import optuna
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
@@ -49,12 +51,14 @@ STEP_LENGTH = (
 VAL_LENGTH = (
     FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
 )  # 1 month
-OPTUNA_TRIALS = 100
-HPO_FLAG = False  # Flag to enable hyperparameter optimization
+OPTUNA_TRIALS = N_TRIALS = 100
+# Get the number of available CPU cores
+num_cores = mp.cpu_count()
+# Set the number of parallel jobs for HPO to 2/3 of the available cores
+OPTUNA_JOBS = N_JOBS = int(num_cores * 2 / 3)
+HPO_FLAG = True  # Flag to enable hyperparameter optimization
 CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
-MODEL_NAME = (
-    "rr"  # Model name. Must be one of: "rr", "xgb", "lgbm", "rf", "mlp"
-)
+MODEL_NAME = "rf"  # Model name. Must be one of: "rr", "xgb", "rf"
 METRIC_NAME = "mae"  # Metric name. Must be one of: "mae", "mse", "rmse", "rmsle", "mape", "smape", "r2", "corr"
 
 # Define metrics for Optuna objective function
@@ -65,7 +69,7 @@ OBJECTIVE_METRICS = {
 }
 # Define model hyperparameter spaces
 MODEL_SPACES = {
-    "rr": {"alpha": optuna.distributions.FloatDistribution(0.0, 1.0)},
+    "rr": {"alpha": optuna.distributions.FloatDistribution(0.01, 1.0)},
     "rf": {
         "n_estimators": optuna.distributions.IntDistribution(2, 150),
         "max_depth": optuna.distributions.IntDistribution(1, 32),
@@ -82,6 +86,9 @@ MODEL_MAPPING = {
     "rf": RandomForestRegressor,
     "xgb": XGBRegressor,
 }
+MLFLOW_LOGGING_FLAG = (
+    False  # Flag to enable logging of parameters and metrics to MLflow
+)
 
 
 # For simulating production

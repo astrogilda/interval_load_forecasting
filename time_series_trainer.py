@@ -7,6 +7,7 @@ import optuna
 import pandas as pd
 import shap
 from matplotlib import pyplot as plt
+from sklearn.preprocessing import StandardScaler
 from sktime.forecasting.model_selection import (
     ExpandingWindowSplitter,
     SlidingWindowSplitter,
@@ -18,10 +19,12 @@ from common_constants import (
     HPO_FLAG,
     INITIAL_WINDOW_LENGTH,
     METRIC_NAME,
+    MLFLOW_LOGGING_FLAG,
     MODEL_MAPPING,
     MODEL_NAME,
     MODEL_SPACES,
     OBJECTIVE_METRICS,
+    OPTUNA_JOBS,
     OPTUNA_TRIALS,
     STEP_LENGTH,
     TARGET_VARIABLE,
@@ -33,24 +36,7 @@ from time_series_xy import TimeSeriesXy
 
 class TimeSeriesTrainer:
     """
-    Time series regression and simulation class.
-
-    Attributes
-    ----------
-    WINDOW_LENGTH : int
-        Length of the sliding window for rolling cross-validation.
-    INITIAL_WINDOW_LENGTH : int
-        Length of the initial window for expanding cross-validation.
-    MAX_LAGS : int
-        Maximum number of lags to use for autoregressive features.
-    OPTUNA_TRIALS : int
-        Number of trials for Optuna optimization.
-    objective_metrics : dict
-        Objective metrics for Optuna optimization.
-    model_spaces : dict
-        Model hyperparameter spaces.
-    model_mapping : dict
-        Model names to model classes mapping.
+    Time series regression class.
     """
 
     def _log_shap_values(self, model, X_train, run_id: str):
@@ -164,13 +150,13 @@ class TimeSeriesTrainer:
         params = {}
         for param_name, distribution in hyperparameter_space.items():
             if isinstance(
-                distribution, optuna.distributions.UniformDistribution
+                distribution, optuna.distributions.FloatDistribution
             ):
                 params[param_name] = trial.suggest_float(
                     param_name, distribution.low, distribution.high
                 )
             elif isinstance(
-                distribution, optuna.distributions.IntUniformDistribution
+                distribution, optuna.distributions.IntDistribution
             ):
                 params[param_name] = trial.suggest_int(
                     param_name, distribution.low, distribution.high
@@ -194,6 +180,11 @@ class TimeSeriesTrainer:
             # Convert to numpy arrays
             X_train, y_train = X_train.to_numpy(), y_train.to_numpy()
             X_test, y_test = X_test.to_numpy(), y_test.to_numpy()
+            # Create the scaler
+            scaler = StandardScaler()
+            # Fit the scaler on the training data and transform both training and test data
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
             # Fit the model
             model.fit(X_train, y_train)
             # Return the metric
@@ -220,6 +211,7 @@ class TimeSeriesTrainer:
         metric_name: str = METRIC_NAME,
         cv_strategy: str = CV_STRATEGY,
         hpo_flag: bool = HPO_FLAG,
+        mlflow_logging_flag: bool = MLFLOW_LOGGING_FLAG,
     ) -> Any:
         """
         Perform walk forward forecasting using a specified regression model and parameter grid.
@@ -257,22 +249,25 @@ class TimeSeriesTrainer:
         # Initialize cross-validator
         cv = self._create_cross_validator(cv_strategy)
 
-        mlflow.start_run(run_name=f"{model_name}_training")
-        mlflow.active_run().info.run_id
-        # Log some basic information
-        mlflow.log_params(
-            {
-                "model_name": model_name,
-                "cv_strategy": cv_strategy,
-                "window_length": WINDOW_LENGTH,
-                "initial_window_length": INITIAL_WINDOW_LENGTH,
-                "step_length": STEP_LENGTH,
-                "metric_name": metric_name,
-            }
-        )
+        if mlflow_logging_flag:
+            # Start the run
+            mlflow.start_run(run_name=f"{model_name}_training")
+            run_id = mlflow.active_run().info.run_id
+            # Log some basic information
+            mlflow.log_params(
+                {
+                    "model_name": model_name,
+                    "cv_strategy": cv_strategy,
+                    "window_length": WINDOW_LENGTH,
+                    "initial_window_length": INITIAL_WINDOW_LENGTH,
+                    "step_length": STEP_LENGTH,
+                    "metric_name": metric_name,
+                }
+            )
 
         best_params = {}
         if hpo_flag:
+            print(f"Number of splits: {cv.get_n_splits(df)}")
             study = optuna.create_study(direction="minimize")
             study.optimize(
                 partial(
@@ -284,28 +279,30 @@ class TimeSeriesTrainer:
                     metric_name=metric_name,
                 ),
                 n_trials=OPTUNA_TRIALS,
+                show_progress_bar=True,
+                n_jobs=OPTUNA_JOBS,
             )
 
             # Best hyperparameters
             best_params = study.best_params
             best_score = study.best_value
 
-            # Log parameters and metrics
-            mlflow.log_params(best_params)
-            mlflow.log_metric("best_hpo_score", best_score)
+            if mlflow_logging_flag:
+                # Log parameters and metrics
+                mlflow.log_params(best_params)
+                mlflow.log_metric("best_hpo_score", best_score)
 
         model_class = MODEL_MAPPING[model_name]
         model = model_class(**best_params)
         X_train, y_train = TimeSeriesXy.df_to_X_y(df, target_variable)
         model.fit(X_train.to_numpy(), y_train.to_numpy())
 
-        # Log model
-        mlflow.sklearn.log_model(model, f"model_{model_name}")
-
-        # Calculate and log SHAP values
-        # self._log_shap_values(model, X_train, run_id)
-
-        # End the run
-        mlflow.end_run()
+        if mlflow_logging_flag:
+            # Log model
+            mlflow.sklearn.log_model(model, f"model_{model_name}")
+            # Calculate and log SHAP values
+            self._log_shap_values(model, X_train, run_id)
+            # End the run
+            mlflow.end_run()
 
         return model

@@ -8,9 +8,12 @@ from matplotlib import pyplot as plt
 
 from common_constants import (
     FORECAST_HORIZON,
+    HPO_FLAG,
     INITIAL_TRAIN_LENGTH,
     LAGS,
     METRIC_NAME,
+    MLFLOW_LOGGING_FLAG,
+    MODEL_NAME,
     OBJECTIVE_METRICS,
     TARGET_VARIABLE,
     TEST_LENGTH,
@@ -67,7 +70,7 @@ class TimeSeriesSimulator:
         y_test_pred : pd.DataFrame
             DataFrame containing the predicted values.
         """
-        X_test, y_test = TimeSeriesXy().df_to_X_y(df, target_variable)
+        X_test, y_test = TimeSeriesXy.df_to_X_y(df, target_variable)
         y_test_pred = model.predict(X_test.to_numpy())
         y_test_pred = pd.DataFrame(
             y_test_pred, index=y_test.index, columns=y_test.columns
@@ -150,18 +153,23 @@ class TimeSeriesSimulator:
             self.df_test_pred
         )
 
-        metric_func = OBJECTIVE_METRICS[metric_name]
-        overall_score = metric_func(self.df_test, self.df_test_pred)
-
-        # Log overall metrics
-        mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
+        if MLFLOW_LOGGING_FLAG:
+            # Log overall metrics
+            metric_func = OBJECTIVE_METRICS[metric_name]
+            overall_score = metric_func(self.df_test, self.df_test_pred)
+            mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
 
         # Save simulation results
         self.save_simulation_results(
             self.df_test, "actual.csv", folder="results"
         )
+        pred_filename = (
+            f"predicted_model={MODEL_NAME}_hpometric={METRIC_NAME}.csv"
+            if HPO_FLAG
+            else f"predicted_model={MODEL_NAME}.csv"
+        )
         self.save_simulation_results(
-            self.df_test_pred, "predicted.csv", folder="results"
+            self.df_test_pred, pred_filename, folder="results"
         )
 
         # Plot simulation results
@@ -187,9 +195,11 @@ class TimeSeriesSimulator:
         metric_func = OBJECTIVE_METRICS[metric_name]
 
         score = metric_func(df_test, df_test_pred)
-        # Log metrics for this simulation run
-        with mlflow.start_run(run_name="simulation_run", nested=True):
-            mlflow.log_metric(f"{metric_name}_score", score)
+
+        if MLFLOW_LOGGING_FLAG:
+            # Log metrics for this simulation run
+            with mlflow.start_run(run_name="simulation_run", nested=True):
+                mlflow.log_metric(f"{metric_name}_score", score)
 
         # Combine actual and predicted values into a DataFrame
         self.df_test = pd.concat([self.df_test, df_test])
@@ -221,8 +231,8 @@ class TimeSeriesSimulator:
 
     @staticmethod
     def plot_simulation_results(
-        filename_pred: str = "actual.csv",
-        filename_actual: str = "predicted.csv",
+        filename_pred: str = "predicted.csv",
+        filename_actual: str = "actual.csv",
         folder: str = "results",
     ) -> None:
         """
@@ -380,21 +390,3 @@ class TimeSeriesSimulator:
             bbox_inches="tight",
             pad_inches=0.1,
         )
-
-
-"""
-if __name__ == "__main__":
-
-from timeseriesregression import TimeSeriesRegression
-# Paths to input CSV files
-y_file = "data/load.csv"
-weather_data_file = None
-
-# Create TimeSeriesRegression object
-tsr = TimeSeriesRegression(y_file, weather_data_file)
-initial_size = tsr.y_data.shape[0]
-steps=1
-tsr.simulate_production(initial_size, steps)
-
-
-"""
