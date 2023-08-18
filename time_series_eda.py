@@ -40,8 +40,12 @@ plt.rcParams.update(plot_settings)
 
 
 class TimeSeriesEDA:
+    """
+    Class for performing Exploratory Data Analysis (EDA) on time series data.
+    """
+
+    @staticmethod
     def plot_time_series(
-        self,
         y: Union[pd.Series, list[pd.Series]],
         title: str,
         label: Union[str, list[str]] = "",
@@ -80,6 +84,7 @@ class TimeSeriesEDA:
                 "If y, label, and color are lists, they must all have the same length"
             )
 
+        plt.close("all")
         plt.figure()
         for y_, label_, color_ in zip(y, label, color):
             plt.plot(y_, label=label_, color=color_)
@@ -92,8 +97,8 @@ class TimeSeriesEDA:
         else:
             plt.show()
 
+    @staticmethod
     def plot_seasonal_decomposition(
-        self,
         y: pd.Series,
         seasonalities: Optional[List[int]] = None,
         savefig_name: Optional[str] = None,
@@ -105,7 +110,7 @@ class TimeSeriesEDA:
         ----------
         y : pd.Series
             Time series data.
-        seasonalities : Union[int, List[int]], optional
+        seasonalities : List[int], optional
             Seasonalities to consider for decomposition. Default is [96, 96*7, 96*30].
         """
         if seasonalities is None:
@@ -118,17 +123,22 @@ class TimeSeriesEDA:
                 * HOURS_PER_DAY
                 * DAYS_PER_MONTH,  # 1 month
             ]
+        if isinstance(seasonalities, int):
+            seasonalities = [seasonalities]
+
         mstl = MSTL(y, periods=seasonalities)
         result = mstl.fit()
         plt.close("all")
+        plt.figure(figsize=(16, 12))
         result.plot()
         if savefig_name is not None:
             plt.savefig(savefig_name)
         else:
             plt.show()
 
+    @staticmethod
     def plot_acf_pacf(
-        self, y: pd.Series, lags: int, savefig_name: Optional[str] = None
+        y: pd.Series, lags: int, savefig_name: Optional[str] = None
     ) -> None:
         """
         Plots the Autocorrelation Function (ACF) and Partial Autocorrelation Function (PACF).
@@ -140,6 +150,7 @@ class TimeSeriesEDA:
         lags : int
             Number of lags to consider.
         """
+        plt.close("all")
         plt.figure()
 
         plt.subplot(211)
@@ -155,8 +166,9 @@ class TimeSeriesEDA:
         else:
             plt.show()
 
+    @staticmethod
     def plot_distribution(
-        self, y: pd.Series, savefig_name: Optional[str] = None
+        y: pd.Series, savefig_name: Optional[str] = None
     ) -> None:
         """
         Plots the distribution of the time series data.
@@ -166,6 +178,7 @@ class TimeSeriesEDA:
         y : pd.Series
             Time series data.
         """
+        plt.close("all")
         plt.figure()
         sns.histplot(y, kde=True, edgecolor="black")
         plt.title("Distribution Plot")
@@ -176,8 +189,8 @@ class TimeSeriesEDA:
         else:
             plt.show()
 
+    @staticmethod
     def plot_patterns(
-        self,
         df: pd.DataFrame,
         target_variable: str,
         x_variable: str,
@@ -198,6 +211,7 @@ class TimeSeriesEDA:
         title : str
             The title of the plot.
         """
+        plt.close("all")
         plt.figure()
         sns.boxplot(data=df, x=x_variable, y=target_variable)
         plt.title(title)
@@ -208,8 +222,8 @@ class TimeSeriesEDA:
         else:
             plt.show()
 
+    @staticmethod
     def plot_heatmap(
-        self,
         df: pd.DataFrame,
         target_variable: str,
         groupby_vars: list,
@@ -231,6 +245,7 @@ class TimeSeriesEDA:
             The title of the heatmap.
         """
         load_data = df.groupby(groupby_vars)[target_variable].mean().unstack()
+        plt.close("all")
         plt.figure()
         sns.heatmap(
             load_data,
@@ -248,12 +263,38 @@ class TimeSeriesEDA:
         else:
             plt.show()
 
+    @staticmethod
+    def plot_rolling_stats(y: pd.Series, window: Optional[int]) -> None:
+        if window is None:
+            window = FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY  # 1 day
+
+        y_mean = y.rolling(window=window).mean()
+        y_median = y.rolling(window=window).median()
+        y_max = y.rolling(window=window).max()
+        y_min = y.rolling(window=window).min()
+
+        # Plot basic statistics
+        TimeSeriesEDA.plot_time_series(
+            [y_mean, y_median, y_max, y_min],
+            label=[
+                f"Rolling Mean ({window})",
+                f"Rolling Median ({window})",
+                f"Rolling Max ({window})",
+                f"Rolling Min ({window})",
+            ],
+            color=["blue", "red", "green", "orange"],
+            title="Rolling Statistics",
+            savefig_name=f"figures/eda/rolling_statistics_{window}.png",
+        )
+
+    @staticmethod
     def perform_eda(
-        self,
         df: pd.DataFrame,
         target_variable: str,
-        freq: int = 24,
-        lags: int = 40,
+        seasonalities: Optional[list[int]] = None,
+        lags: int = FIFTEEN_MINUTES_PER_HOUR
+        * HOURS_PER_DAY
+        * DAYS_PER_WEEK,  # 1 week
     ) -> None:
         """
         Performs Exploratory Data Analysis (EDA) on the time series data.
@@ -264,10 +305,10 @@ class TimeSeriesEDA:
             DataFrame containing the time series data.
         target_variable : str
             The target variable to be analyzed.
-        freq : int, optional
-            Frequency of the seasonality for seasonal decomposition. Default is 24.
+        seasonalities : list[int], optional
+            Seasonalities for seasonal decomposition. Default is None, and is handled in the plot_seasonal_decomposition method.
         lags : int, optional
-            Number of lags to consider for ACF and PACF plots. Default is 40.
+            Number of lags to consider for ACF and PACF plots. Default is equivalent of 1 week.
         """
         # Ensure that we do not modify the original dataframe
         df = df.copy()
@@ -282,72 +323,92 @@ class TimeSeriesEDA:
 
         # Call the plotting methods
         y = df[target_variable]
-        self.plot_time_series(
-            y, title="Load Time Series", savefig_name="load_time_series.png"
+        TimeSeriesEDA.plot_time_series(
+            y,
+            title="Load Time Series",
+            savefig_name="figures/eda/load_time_series.png",
         )
-
-        # Calculate basic statistics
-        y_mean = y.rolling(
-            window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
-        ).mean()
-        y_median = y.rolling(
-            window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
-        ).median()
-        y_max = y.rolling(
-            window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
-        ).max()
-        y_min = y.rolling(
-            window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
-        ).min()
 
         # Plot basic statistics
-        self.plot_time_series(
-            [y_mean, y_median, y_max, y_min],
-            label=[
-                "Rolling Mean (24h)",
-                "Rolling Median (24h)",
-                "Rolling Max (24h)",
-                "Rolling Min (24h)",
-            ],
-            title="Rolling Statistics",
-            savefig_name="rolling_statistics.png",
+        TimeSeriesEDA.plot_rolling_stats(
+            y, window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY
+        )  # 1 day
+        TimeSeriesEDA.plot_rolling_stats(
+            y, window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_WEEK
+        )  # 1 week
+        TimeSeriesEDA.plot_rolling_stats(
+            y, window=FIFTEEN_MINUTES_PER_HOUR * HOURS_PER_DAY * DAYS_PER_MONTH
+        )  # 1 month
+
+        # Plot seasonal decomposition, ACF, PACF
+        """
+        TimeSeriesEDA.plot_seasonal_decomposition(
+            y,
+            seasonalities=seasonalities,
+            savefig_name="figures/eda/seasonal_decomposition.png",
         )
 
-        # self.plot_seasonal_decomposition(y, freq)
-        self.plot_acf_pacf(y, lags, savefig_name="acf_pacf.png")
-        self.plot_distribution(y, savefig_name="distribution.png")
-        self.plot_patterns(
+        TimeSeriesEDA.plot_acf_pacf(
+            y, lags, savefig_name="figures/eda/acf_pacf.png"
+        )
+        """
+        TimeSeriesEDA.plot_distribution(
+            y, savefig_name="figures/eda/distribution.png"
+        )
+
+        # Plot load distributions conditional on hour, day, and month
+        for hour in df["hour"].unique():
+            subset = df[df["hour"] == hour]
+            TimeSeriesEDA.plot_distribution(
+                subset[target_variable],
+                savefig_name=f"figures/eda/distribution_hour_{hour}.png",
+            )
+        for day in df["day"].unique():
+            subset = df[df["day"] == day]
+            TimeSeriesEDA.plot_distribution(
+                subset[target_variable],
+                savefig_name=f"figures/eda/distribution_day_{day}.png",
+            )
+        for month in df["month"].unique():
+            subset = df[df["month"] == month]
+            TimeSeriesEDA.plot_distribution(
+                subset[target_variable],
+                savefig_name=f"figures/eda/distribution_month_{month}.png",
+            )
+
+        # Plot load patterns conditional on hour, day, and month
+        TimeSeriesEDA.plot_patterns(
             df,
             target_variable,
             "hour",
             "Hourly Load Patterns",
-            savefig_name="hourly_load_patterns.png",
+            savefig_name="figures/eda/hourly_load_patterns.png",
         )
-        self.plot_patterns(
+        TimeSeriesEDA.plot_patterns(
             df,
             target_variable,
             "day",
             "Daily Load Patterns",
-            savefig_name="daily_load_patterns.png",
+            savefig_name="figures/eda/daily_load_patterns.png",
         )
-        self.plot_patterns(
+        TimeSeriesEDA.plot_patterns(
             df,
             target_variable,
             "month",
             "Monthly Load Patterns",
-            savefig_name="monthly_load_patterns.png",
+            savefig_name="figures/eda/monthly_load_patterns.png",
         )
-        self.plot_heatmap(
+        TimeSeriesEDA.plot_heatmap(
             df,
             target_variable,
             ["day", "hour"],
             "Weekly Load Heatmap",
-            savefig_name="weekly_load_heatmap.png",
+            savefig_name="figures/eda/weekly_load_heatmap.png",
         )
-        self.plot_heatmap(
+        TimeSeriesEDA.plot_heatmap(
             df,
             target_variable,
             ["month", "hour"],
             "Annual Load Heatmap",
-            savefig_name="annual_load_heatmap.png",
+            savefig_name="figures/eda/annual_load_heatmap.png",
         )
