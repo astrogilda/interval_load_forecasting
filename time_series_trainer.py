@@ -186,7 +186,16 @@ class TimeSeriesTrainer:
             X_train = scaler.fit_transform(X_train)
             X_test = scaler.transform(X_test)
             # Fit the model
-            model.fit(X_train, y_train)
+            if model_class == "xgb":
+                model.fit(
+                    X_train,
+                    y_train,
+                    eval_set=[(X_test, y_test)],
+                    early_stopping_rounds=10,
+                    verbose=False,
+                )
+            else:
+                model.fit(X_train, y_train)
             # Return the metric
             score = metric_func(y_test, model.predict(X_test))
             scores.append(score)

@@ -58,7 +58,7 @@ num_cores = mp.cpu_count()
 OPTUNA_JOBS = N_JOBS = int(num_cores * 2 / 3)
 HPO_FLAG = True  # Flag to enable hyperparameter optimization
 CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
-MODEL_NAME = "rf"  # Model name. Must be one of: "rr", "xgb", "rf"
+MODEL_NAME = "xgb"  # Model name. Must be one of: "rr", "xgb", "rf"
 METRIC_NAME = "mae"  # Metric name. Must be one of: "mae", "mse", "rmse", "rmsle", "mape", "smape", "r2", "corr"
 
 # Define metrics for Optuna objective function
@@ -69,15 +69,24 @@ OBJECTIVE_METRICS = {
 }
 # Define model hyperparameter spaces
 MODEL_SPACES = {
-    "rr": {"alpha": optuna.distributions.FloatDistribution(0.01, 1.0)},
+    "rr": {
+        "alpha": optuna.distributions.FloatDistribution(0.01, 1.0, log=True)
+    },
     "rf": {
         "n_estimators": optuna.distributions.IntDistribution(2, 150),
         "max_depth": optuna.distributions.IntDistribution(1, 32),
+        "min_samples_split": optuna.distributions.IntDistribution(2, 20),
+        "min_samples_leaf": optuna.distributions.IntDistribution(1, 20),
     },
     "xgb": {
         "n_estimators": optuna.distributions.IntDistribution(2, 150),
         "max_depth": optuna.distributions.IntDistribution(1, 10),
-        "learning_rate": optuna.distributions.FloatDistribution(0.01, 0.3),
+        "learning_rate": optuna.distributions.FloatDistribution(
+            0.01, 0.3, log=True
+        ),
+        "subsample": optuna.distributions.FloatDistribution(0.5, 1.0),
+        "colsample_bytree": optuna.distributions.FloatDistribution(0.5, 1.0),
+        "gamma": optuna.distributions.FloatDistribution(0, 5),
     },
 }
 # Define model mapping
