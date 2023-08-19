@@ -183,13 +183,15 @@ class TimeSeriesSimulator:
         # Save scores
         self.score = overall_score
 
-        # print("Saving residual plots...")
+        print("Saving residual plots...")
         # Save residual plots
-        # TimeSeriesSimulator.plot_simulation_results(
-        #    filename_actual="actual.csv",
-        #    filename_pred=pred_filename,
-        #    folder="results/residuals",
-        # )
+        filename_actual = str(Path("results") / "actual.csv")
+        filename_pred = str(Path("results") / pred_filename)
+        TimeSeriesSimulator.plot_simulation_results(
+            filename_actual=filename_actual,
+            filename_pred=filename_pred,
+            folder="figures/results/residuals",
+        )
 
     def update_simulation_results(
         self,
@@ -246,40 +248,29 @@ class TimeSeriesSimulator:
 
     @staticmethod
     def plot_simulation_results(
-        filename_pred: str,
         filename_actual: str,
-        folder: str = "figures/results",
+        filename_pred: str,
+        folder: str = "figures/results/residuals",
     ) -> None:
         """
         Plots the simulation results (actual and predicted values).
 
         Parameters
         ----------
-        filename : str
-            Name of the file containing the results.
+        filename_actual : str
+            Path to the CSV file containing the actual values.
+        filename_pred : str
+            Path to the CSV file containing the predicted values.
         folder : str
-            Name of the folder containing the results.
+            Name of the folder to save the plots.
         """
-        # Load the results from the CSV file
-        df_actual = pd.read_csv(Path(folder) / filename_actual, index_col=0)
-        df_pred = pd.read_csv(Path(folder) / filename_pred, index_col=0)
+        # Create results folder if it doesn't exist
+        if not Path(folder).exists():
+            Path(folder).mkdir(parents=True)
 
-        """
-        # Line plot of actual and predicted values
-        plt.close("all")
-        df_results.plot(
-            kind="line", color=["blue", "red"], legend=True, figsize=(16, 8)
-        )
-        plt.title("Hourly Electricity Load", fontsize=20)
-        plt.xlabel("Time", fontsize=15)
-        plt.ylabel("Electricity Load", fontsize=15)
-        plt.savefig(
-            "pred_vs_true_lineplot.png",
-            dpi=300,
-            bbox_inches="tight",
-            pad_inches=0.1,
-        )
-        """
+        # Load actual and predicted values
+        df_actual = pd.read_csv(filename_actual, index_col=0)
+        df_pred = pd.read_csv(filename_pred, index_col=0)
 
         # Calculate residuals (actual - predicted)
         df_residuals = df_actual - df_pred
@@ -312,7 +303,7 @@ class TimeSeriesSimulator:
             plt.legend()
             plt.title(f"Actual vs. Predicted {column}", fontsize=20)
             plt.savefig(
-                f"figures/actual_vs_predicted_{column}_scatterplot.png",
+                f"{folder}/actual_vs_predicted_{column}_scatterplot.png",
                 dpi=300,
                 bbox_inches="tight",
                 pad_inches=0.1,
@@ -326,7 +317,7 @@ class TimeSeriesSimulator:
         plt.ylabel("Frequency", fontsize=15)
         plt.title("Histogram of Mean Residuals", fontsize=20)
         plt.savefig(
-            "figures/residuals_histogram_mean.png",
+            f"{folder}/residuals_histogram_mean.png",
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
@@ -340,7 +331,7 @@ class TimeSeriesSimulator:
         plt.ylabel("Frequency", fontsize=15)
         plt.title("Histogram of max Residuals", fontsize=20)
         plt.savefig(
-            "figures/residuals_histogram_p95quantile.png",
+            f"{folder}/residuals_histogram_p95quantile.png",
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
@@ -354,33 +345,11 @@ class TimeSeriesSimulator:
         plt.ylabel("Frequency", fontsize=15)
         plt.title("Histogram of min Residuals", fontsize=20)
         plt.savefig(
-            "figures/residuals_histogram_p05quantile.png",
+            f"{folder}/residuals_histogram_p05quantile.png",
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
         )
-
-        """
-        # Line plot of residuals over time
-        plt.close("all")
-        # plt.figure(figsize=FIGSIZE)
-        plt.plot(
-            df_results.index,
-            df_results["residuals"],
-            label="Residuals",
-            color="red",
-        )
-        plt.axhline(0, color="k", linestyle="--", linewidth=1)
-        plt.xlabel("Datetime", fontsize=15)
-        plt.ylabel("Residual", fontsize=15)
-        plt.title("Residuals Over Time", fontsize=20)
-        plt.savefig(
-            "residuals_lineplot.png",
-            dpi=300,
-            bbox_inches="tight",
-            pad_inches=0.1,
-        )
-        """
 
         # Group by hour and day and calculate mean residuals
         df_residuals["mean_residuals"] = df_residuals.mean(axis=1)
@@ -400,7 +369,7 @@ class TimeSeriesSimulator:
         plt.xlabel("Day of Week", fontsize=15)
         plt.ylabel("Hour of Day", fontsize=15)
         plt.savefig(
-            "figures/residuals_heatmap.png",
+            f"{folder}/residuals_heatmap.png",
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,

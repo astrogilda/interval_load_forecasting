@@ -10,7 +10,6 @@
 - [Configuration Management](#configuration-management)
   - [`common_constants.py`](#common_constants.py)
   - [`time_constants.py`](#time_constants.py)
-  - [Why Configuration Management?](#why-configuration-management)
 - [Data Loading](#data-loading)
   - [`time_series_loader.py`](#time_series_loader.py)
 - [Data Preprocessing](#data-preprocessing)
