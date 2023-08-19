@@ -56,11 +56,25 @@ Refer to the code documentation in `time_series_eda.py` for detailed information
 
 ## Data Loading
 
-Efficient data loading is crucial for handling large datasets and ensuring data integrity. In this project, the `TimeSeriesLoader` class is used to load the target variable and weather data from CSV files.
+The `time_series_loader.py` file contains functionalities for loading time series data from CSV files:
+
+### `TimeSeriesLoader` Class
+- **Constructor**: Initializes with paths for y (target) data and weather data, loads the data.
+- **`load_data` Method**: Loads data from CSV files and performs sanity checks, including file existence and data type validation.
+
+Data loading plays a crucial role in gathering the raw time series data, ensuring its correctness and readiness for further analysis.
 
 ## Data Preprocessing
 
-Preprocessing ensures that the data is clean, consistent, and ready for modeling. The `TimeSeriesPreprocessor` class handles common preprocessing tasks in time series forecasting.
+The `time_series_preprocessor.py` file contains functionalities for preprocessing time series data:
+
+### `TimeSeriesPreprocessor` Class
+- **Constructor**: Initializes with y (target) data and optional weather data.
+- **`_handle_missing_indices` Method**: Fills missing indices, values, and infinite values in the data.
+- **`_align_timestamps` Method**: Aligns timestamps across multiple data sources.
+- **`merge_y_and_weather_data` Method**: Merges y data and weather data after handling inconsistencies and alignment.
+
+Data preprocessing is essential to prepare the time series data for analysis, ensuring consistency, handling missing values, and alignment of different data sources.
 
 ## Feature Engineering
 
