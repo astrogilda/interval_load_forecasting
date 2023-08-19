@@ -111,11 +111,13 @@ Data preprocessing is essential to prepare the time series data for analysis, en
 The `time_series_featurizer.py` file encompasses functionalities for transforming and enriching time series data through feature engineering. This process enhances the model's ability to capture complex temporal dynamics:
 
 ### `TimeSeriesFeaturizer` Class
-- **`_cyclical_encoding` Method**: Encodes cyclical features like months and days using sine and cosine transformations.
+- **`cyclical_encoding` Method**: Encodes cyclical features like months and days using sine and cosine transformations.
 - **`create_calendar_features` Method**: Extracts calendar features such as month, day, hour, and minute.
 - **`create_holiday_features` Method**: Adds binary features for US federal holidays.
+- **`find_best_lag_pacf` Method**: Finds the optimal lag for a time series using the Partial Autocorrelation Function (PACF). It considers the maximum number of lags provided and returns the lag with the highest PACF, useful for identifying significant temporal relationships in the data.
+- **`stats_features` Method**: Generates summary statistics features from a DataFrame. It computes mean, standard deviation, minimum, maximum, median, skewness, and kurtosis, providing a comprehensive statistical summary of the specified column, aiding in capturing the underlying distributional properties of the time series data.
 - **`create_ar_features` Method**: Creates autoregressive features leveraging temporal dependencies.
-- **`featurize_for_regression` Method**: Prepares data for regression by combining various features and handling alignment, zero variability, and NaNs.
+- **`create_features` Method**: Prepares data for regression by combining various features and handling alignment, zero variability, and NaNs.
 
 Feature engineering plays a pivotal role in revealing underlying patterns and relationships in the time series data, leading to robust and insightful models.
 
@@ -123,12 +125,9 @@ Feature engineering plays a pivotal role in revealing underlying patterns and re
 
 The `time_series_xy.py` file focuses on structuring time series data into a format suitable for modeling. This involves creating features that represent temporal dependencies, future horizons, and relevant attributes:
 
-### `create_future_features` Method
-- **Functionality**: Generates future features for specified target variables at given forecast horizons.
-- **Error Handling**: Includes validations for DateTimeIndex, target variables, and forecast horizons.
-
-### `df_to_X_y` Method
-- **Functionality**: Prepares the DataFrame for regression by creating features and structuring input (X) and target (y) variables.
+### `TimeSeriesXy` Class
+- **`create_future_features` Method**: Generates future features for specified target variables at given forecast horizons. Includes validations for DateTimeIndex, target variables, and forecast horizons.
+- **`df_to_X_y` Method**: Prepares the DataFrame for regression by creating features and structuring input (X) and target (y) variables.
 
 Data structuring is vital in transforming raw time series data into a structured format, ready for modeling, ensuring that essential temporal relationships are captured and represented.
 
