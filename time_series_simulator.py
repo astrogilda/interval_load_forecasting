@@ -149,7 +149,7 @@ class TimeSeriesSimulator:
             )
 
             # Update i
-            i = i + LAGS + FORECAST_HORIZON
+            i = i + test_length - (LAGS) + 1
 
             # Update iteration
             iteration += 1
@@ -172,9 +172,9 @@ class TimeSeriesSimulator:
             self.df_test, "actual.csv", folder="results"
         )
         pred_filename = (
-            f"predicted_model={MODEL_NAME}_hpometric={METRIC_NAME}.csv"
+            f"predicted_model_{MODEL_NAME}_hpometric_{METRIC_NAME}.csv"
             if HPO_FLAG
-            else f"predicted_model={MODEL_NAME}.csv"
+            else f"predicted_model_{MODEL_NAME}.csv"
         )
         self.save_simulation_results(
             self.df_test_pred, pred_filename, folder="results"

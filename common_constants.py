@@ -96,7 +96,7 @@ MODEL_MAPPING = {
     "xgb": XGBRegressor,
 }
 MLFLOW_LOGGING_FLAG = (
-    False  # Flag to enable logging of parameters and metrics to MLflow
+    True  # Flag to enable logging of parameters and metrics to MLflow
 )
 SHAP_VALUES_FLAG = False  # Flag to enable calculation of SHAP values
 

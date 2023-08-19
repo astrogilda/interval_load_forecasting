@@ -1,25 +1,60 @@
+
+## Table of Contents
+
+- [24 Hour Load Forecasting](#24-hour-load-forecasting)
+  - [Overview](#overview)
+  - [Modular Design](#modular-design)
+  - [Best Practices](#best-practices)
+  - [Forecasting Methodology](#forecasting-methodology)
+  - [Future Enhancements](#future-enhancements)
+- [Configuration Management](#configuration-management)
+  - [`common_constants.py`](#common_constants.py)
+  - [`time_constants.py`](#time_constants.py)
+  - [Why Configuration Management?](#why-configuration-management)
+- [Data Loading](#data-loading)
+  - [`time_series_loader.py`](#time_series_loader.py)
+- [Data Preprocessing](#data-preprocessing)
+  - [`time_series_preprocessor.py`](#time_series_preprocessor.py)
+- [Feature Engineering](#feature-engineering)
+  - [`time_series_featurizer.py`](#time_series_featurizer.py)
+- [Data Structuring](#data-structuring)
+  - [`time_series_xy.py`](#time_series_xy.py)
+- [Model Training, Tracking, Hyperparameter Tuning, and Explainability](#model-training-tracking-hyperparameter-tuning-and-explainability)
+  - [`time_series_trainer.py`](#time_series_trainer.py)
+- [Time Series Simulation and Error Analysis](#time-series-simulation-and-error-analysis)
+  - [`time_series_simulator.py`](#time_series_simulator.py)
+- [Future Work](#future-work)
 # 24 Hour Load Forecasting
 
 This project focuses on using 15-minute load data for 24-hour load forecasting. The solution is modular, maintainable, and follows best practices in software development and data science.
 
-## Table of Contents
+## Overview
+24-hour load forecasting is a critical aspect of energy management, enabling accurate planning and optimization of energy resources. Utilizing 15-minute load data, this project employs state-of-the-art machine learning techniques and methodologies to predict energy consumption patterns 24 hours ahead.
 
-1. [Configuration Management] (#configuration-management)
-2. [Exploratory Data Analysis](#exploratory-data-analysis)
-3. [Data Loading](#data-loading)
-4. [Data Preprocessing](#data-preprocessing)
-5. [Feature Engineering](#feature-engineering)
-6. [Data Structuring](#data-structuring)
-7. [Model Training and Hyperparameter Tuning](#model-training-and-hyperparameter-tuning)
-8. [Error Analysis](#error-analysis)
-9. [Time Series Simulation](#time-series-simulation)
-10. [Model Comparison](#model-comparison)
-11. [Model Tracking and Explainability](#model-tracking-and-explainability)
-12. [Future Work](#future-work)
+## Modular Design
+The solution is structured into various modules, each responsible for specific tasks such as data loading, preprocessing, feature engineering, model training, simulation, and error analysis. This modular approach ensures flexibility, extensibility, and ease of maintenance.
 
+## Best Practices
+Incorporating best practices in both software development and data science, the project emphasizes code quality, reusability, scalability, and robustness. It includes proper configuration management, error handling, logging, testing, and documentation.
 
+## Forecasting Methodology
+A variety of forecasting models are explored, including Random Forest, XGBoost, and Ridge Regression, along with hyperparameter tuning, cross-validation, and explainability techniques. The project also simulates a production environment to understand how the model performs with continuous data inflow.
+
+## Future Enhancements
+With a roadmap for future improvements, the project considers aspects such as continuous training, cloud deployment, API development, enhanced testing, and comprehensive documentation to ensure production readiness.
+
+This project serves as a robust solution for 24-hour load forecasting, aligning with industry standards and addressing the multifaceted challenges of time series forecasting in the energy domain.
+
+--------------------------------------------------------------------------
 ## Configuration Management
-`common_constants.py` and `time_constants.py`
+
+The configuration management in this project is handled through two primary files: `common_constants.py` and `time_constants.py`.
+
+### `common_constants.py`
+This file contains essential configurations and constants used throughout the project, including importing necessary libraries and dependencies, defining constants related to data loading, and importing time-related constants from the `time_constants.py` file.
+
+### `time_constants.py`
+This file focuses on defining time-related constants, essential for time series analysis and feature engineering. The constants include various time-related attributes like fifteen-minute intervals, seconds, minutes, hours, days, months, and years.
 
 ## Exploratory Data Analysis (EDA)
 
@@ -130,7 +165,22 @@ The use of MLflow enhances reproducibility, collaboration, and the overall effec
 
 ## Time Series Simulation and Error Analysis
 
-Simulation emulates a production environment for validation. The `TimeSeriesSimulator` class provides functionality to simulate a production-like environment for time series forecasting.
+The `time_series_simulator.py` file offers a comprehensive framework for simulating a production environment and analyzing errors in time series forecasting:
+
+### `TimeSeriesRegression` Class
+- **Constructor**: Initializes with combined y and weather data.
+- **`forecast` Method**: Performs forecasting with the trained model.
+- **`remove_duplicates` Method**: Removes duplicates from a DataFrame.
+- **`simulate_production` Method**: Simulates a production environment, trains models, calculates residuals, and generates plots for analysis.
+
+This simulation and error analysis approach provides insights into model performance in dynamic scenarios and a detailed understanding of error characteristics and distributions.
+
+### Files Generated
+- **Histogram of Mean Residuals**: `figures/residuals_histogram_mean.png`
+- **Histogram of .95 Quantile Residuals**: `figures/residuals_histogram_p95quantile.png`
+- **Histogram of .05 Quantile Residuals**: `figures/residuals_histogram_p05quantile.png`
+- **Line Plot of Residuals Over Time**: `figures/residuals_lineplot.png`
+- **Heatmap of Mean Residuals by Hour and Day**: `figures/residuals_heatmap.png`
 
 ## Future Work
 
