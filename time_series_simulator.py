@@ -115,7 +115,9 @@ class TimeSeriesSimulator:
             Number of steps to simulate in the production environment. This determines how many iterations the simulation will run.
         """
         i = initial_size
+        iteration = 0
         while True:
+            print(f"iteration: {iteration}")
             # Merge y_data and weather_data
             df_train, df_test = (
                 self.df.iloc[:i, :],
@@ -149,6 +151,9 @@ class TimeSeriesSimulator:
             # Update i
             i = i + LAGS + FORECAST_HORIZON
 
+            # Update iteration
+            iteration += 1
+
         # Remove duplicates
         self.df_test = TimeSeriesSimulator.remove_duplicates(self.df_test)
         self.df_test_pred = TimeSeriesSimulator.remove_duplicates(
@@ -161,6 +166,7 @@ class TimeSeriesSimulator:
             # Log overall metrics
             mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
 
+        print("Saving simulation results to csvs...")
         # Save simulation results
         self.save_simulation_results(
             self.df_test, "actual.csv", folder="results"
@@ -177,12 +183,13 @@ class TimeSeriesSimulator:
         # Save scores
         self.score = overall_score
 
+        # print("Saving residual plots...")
         # Save residual plots
-        TimeSeriesSimulator.plot_simulation_results(
-            filename_actual="actual.csv",
-            filename_pred=pred_filename,
-            folder="results/residuals",
-        )
+        # TimeSeriesSimulator.plot_simulation_results(
+        #    filename_actual="actual.csv",
+        #    filename_pred=pred_filename,
+        #    folder="results/residuals",
+        # )
 
     def update_simulation_results(
         self,

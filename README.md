@@ -78,15 +78,55 @@ Data preprocessing is essential to prepare the time series data for analysis, en
 
 ## Feature Engineering
 
-Feature engineering is vital in capturing essential temporal patterns. The `TimeSeriesFeaturizer` class provides methods for feature engineering specific to time series data.
+The `time_series_featurizer.py` file encompasses functionalities for transforming and enriching time series data through feature engineering. This process enhances the model's ability to capture complex temporal dynamics:
+
+### `TimeSeriesFeaturizer` Class
+- **`_cyclical_encoding` Method**: Encodes cyclical features like months and days using sine and cosine transformations.
+- **`create_calendar_features` Method**: Extracts calendar features such as month, day, hour, and minute.
+- **`create_holiday_features` Method**: Adds binary features for US federal holidays.
+- **`create_ar_features` Method**: Creates autoregressive features leveraging temporal dependencies.
+- **`featurize_for_regression` Method**: Prepares data for regression by combining various features and handling alignment, zero variability, and NaNs.
+
+Feature engineering plays a pivotal role in revealing underlying patterns and relationships in the time series data, leading to robust and insightful models.
 
 ## Data Structuring
 
-Proper data structuring aligns the data for modeling. The `TimeSeriesXy` class provides functionality to create future features for time series regression.
+The `time_series_xy.py` file focuses on structuring time series data into a format suitable for modeling. This involves creating features that represent temporal dependencies, future horizons, and relevant attributes:
+
+### `create_future_features` Method
+- **Functionality**: Generates future features for specified target variables at given forecast horizons.
+- **Error Handling**: Includes validations for DateTimeIndex, target variables, and forecast horizons.
+
+### `df_to_X_y` Method
+- **Functionality**: Prepares the DataFrame for regression by creating features and structuring input (X) and target (y) variables.
+
+Data structuring is vital in transforming raw time series data into a structured format, ready for modeling, ensuring that essential temporal relationships are captured and represented.
 
 ## Model Training, Tracking, Hyperparameter Tuning, and Explainability
 
-Model training is the core of forecasting, involving model selection, tuning, and evaluation. The `TimeSeriesTrainer` class provides a comprehensive solution for time series regression, including model training, hyperparameter tuning, cross-validation, and logging. Tracking model versions and explaining their decisions is important in a machine learning pipeline. MLflow is integrated for model tracking, and SHAP (SHapley Additive exPlanations) is used for model explainability.
+The `time_series_trainer.py` file embodies a comprehensive approach to training, tuning, tracking, and explaining time series forecasting models:
+
+### `TimeSeriesTrainer` Class
+- **Constructor**: Initializes the trainer object.
+- **`_calculate_and_log_shap_values` Method**: Calculates and logs SHAP values, saved as PNG plots and CSV files in `figures/results/shap` and `results/shap`.
+- **`_create_cross_validator` Method**: Creates a cross-validator object based on specified strategies.
+- **`train_model` Method**: Trains, tunes, and logs the model using cross-validation, hyperparameter optimization, feature scaling, and SHAP value calculation.
+
+This section emphasizes robust model development, with a focus on optimization, tracking, and explainability. It facilitates an iterative and insightful modeling process, enabling a deeper understanding of time series dynamics and feature contributions.
+
+### Files Generated
+- **SHAP Summary Plots**: `figures/results/shap/shap_summary_step_{step}_model_{model_name}_{run_id}.png`
+- **SHAP Values (CSV)**: `results/shap/shap_summary_step_{step}_model_{model_name}_{run_id}.csv`
+
+### MLflow Integration
+
+MLflow is integrated within the `TimeSeriesTrainer` class to facilitate experiment tracking, model logging, and the recording of hyperparameters and evaluation metrics:
+
+- **Experiment Tracking**: Organizes and stores information related to different modeling runs, allowing for comparison and analysis of different models, hyperparameters, and results.
+- **Model Logging**: Logs trained models, making them accessible for future use, sharing, and deployment.
+- **Parameter and Metric Recording**: Captures model hyperparameters and evaluation metrics, enabling a transparent and traceable modeling process.
+
+The use of MLflow enhances reproducibility, collaboration, and the overall effectiveness of the model development process. By systematically tracking and logging information, MLflow supports a data-driven approach to model selection, tuning, and explanation.
 
 ## Time Series Simulation and Error Analysis
 
