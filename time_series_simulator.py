@@ -46,10 +46,11 @@ class TimeSeriesSimulator:
         self.df = df
         self.df_test = pd.DataFrame()
         self.df_test_pred = pd.DataFrame()
+        self.score = None
 
     @staticmethod
     def forecast(
-        df: pd.DataFrame, target_variable: str, model: Any
+        df: pd.DataFrame, target_variable: str, model: Any, scaler: Any
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Forecast using the trained model.
@@ -71,7 +72,8 @@ class TimeSeriesSimulator:
             DataFrame containing the predicted values.
         """
         X_test, y_test = TimeSeriesXy.df_to_X_y(df, target_variable)
-        y_test_pred = model.predict(X_test.to_numpy())
+        X_test_scaled = scaler.transform(X_test)
+        y_test_pred = model.predict(X_test_scaled)
         y_test_pred = pd.DataFrame(
             y_test_pred, index=y_test.index, columns=y_test.columns
         )
@@ -127,11 +129,11 @@ class TimeSeriesSimulator:
 
             # Train model
             trainer = TimeSeriesTrainer()
-            trained_model = trainer.train(df=df_train)
+            trained_model, fitted_scaler = trainer.train(df=df_train)
 
             # Forecast
             df_test, df_test_pred = TimeSeriesSimulator.forecast(
-                df_test, TARGET_VARIABLE, trained_model
+                df_test, TARGET_VARIABLE, trained_model, fitted_scaler
             )
             # print(f"df_test.shape: {df_test.shape}")
             # print(f"df_test_pred.shape: {df_test_pred.shape}")
@@ -153,10 +155,10 @@ class TimeSeriesSimulator:
             self.df_test_pred
         )
 
+        metric_func = OBJECTIVE_METRICS[metric_name]
+        overall_score = metric_func(self.df_test, self.df_test_pred)
         if MLFLOW_LOGGING_FLAG:
             # Log overall metrics
-            metric_func = OBJECTIVE_METRICS[metric_name]
-            overall_score = metric_func(self.df_test, self.df_test_pred)
             mlflow.log_metric(f"overall_{metric_name}_score", overall_score)
 
         # Save simulation results
@@ -172,9 +174,15 @@ class TimeSeriesSimulator:
             self.df_test_pred, pred_filename, folder="results"
         )
 
-        # Plot simulation results
-        # self.plot_simulation_results("actual.csv", folder="results")
-        # self.plot_simulation_results("predicted.csv", folder="results")
+        # Save scores
+        self.score = overall_score
+
+        # Save residual plots
+        TimeSeriesSimulator.plot_simulation_results(
+            filename_actual="actual.csv",
+            filename_pred=pred_filename,
+            folder="results/residuals",
+        )
 
     def update_simulation_results(
         self,
@@ -231,9 +239,9 @@ class TimeSeriesSimulator:
 
     @staticmethod
     def plot_simulation_results(
-        filename_pred: str = "predicted.csv",
-        filename_actual: str = "actual.csv",
-        folder: str = "results",
+        filename_pred: str,
+        filename_actual: str,
+        folder: str = "figures/results",
     ) -> None:
         """
         Plots the simulation results (actual and predicted values).

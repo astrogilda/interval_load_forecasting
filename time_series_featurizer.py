@@ -1,9 +1,18 @@
-from typing import Dict, Tuple
-
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
+from pandas.tseries.holiday import USFederalHolidayCalendar
 from statsmodels.tsa.stattools import pacf
+
+from common_constants import (
+    AR_FROM_WEATHER_DATA,
+    AR_FROM_Y,
+    LAGS,
+    MAX_LAGS,
+    TARGET_VARIABLE,
+)
+from time_constants import MONTHS_PER_YEAR
+from time_series_preprocessor import TimeSeriesPreprocessor
 
 
 class TimeSeriesFeaturizer:
@@ -19,6 +28,43 @@ class TimeSeriesFeaturizer:
     create_regression_data
         Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
     """
+
+    @staticmethod
+    def _cyclical_encoding(
+        df: pd.DataFrame, columns: list[str], max_vals: list
+    ) -> pd.DataFrame:
+        """
+        Encodes a cyclical feature using sine and cosine transformations.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame with a DateTime index.
+        columns : list[str]
+            List of column names to encode.
+        max_vals : list
+            List of maximum values for each column.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with the encoded features.
+        """
+        # Ensure that index is a DateTimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index must be a DateTimeIndex")
+
+        # Ensure that columns and max_vals have the same length
+        if len(columns) != len(max_vals):
+            raise ValueError("columns and max_vals must have the same length")
+
+        # Encode the cyclical features
+        for column, max_val in zip(columns, max_vals):
+            df[f"{column}_sin"] = np.sin(2 * np.pi * df[column] / max_val)
+            df[f"{column}_cos"] = np.cos(2 * np.pi * df[column] / max_val)
+            df.drop(columns=column, inplace=True)
+
+        return df
 
     @staticmethod
     def create_calendar_features(
@@ -44,19 +90,58 @@ class TimeSeriesFeaturizer:
             raise TypeError("Index must be a DateTimeIndex")
 
         # Extract calendar features from the index
-        df["month"] = (
-            df.index.month / (12 - 1) if normalize else df.index.month
-        )
-        df["dayofmonth"] = df.index.day / 31 if normalize else df.index.day
-        df["dayofweek"] = (
-            df.index.dayofweek / (7 - 1) if normalize else df.index.dayofweek
-        )
-        df["hourofday"] = (
-            df.index.hour / (24 - 1) if normalize else df.index.hour
-        )
-        df["minuteofhour"] = (
-            df.index.minute / (60 - 1) if normalize else df.index.minute
-        )
+        df["month"] = df.index.month
+        df["dayofmonth"] = df.index.day
+        df["dayofweek"] = df.index.dayofweek
+        df["hourofday"] = df.index.hour
+        df["minuteofhour"] = df.index.minute
+
+        if normalize:
+            TimeSeriesFeaturizer._cyclical_encoding(
+                df,
+                [
+                    "month",
+                    "dayofmonth",
+                    "dayofweek",
+                    "hourofday",
+                    "minuteofhour",
+                ],
+                [
+                    MONTHS_PER_YEAR,
+                    df.index.days_in_month,
+                    7 - 1,
+                    24 - 1,
+                    60 - 1,
+                ],
+            )
+
+        return df
+
+    @staticmethod
+    def create_holiday_features(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Adds a binary feature indicating US federal holidays to a DataFrame with a DateTime index.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame with a DateTime index.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with a new binary feature 'is_holiday', where 1 indicates a US federal holiday and 0 indicates otherwise.
+        """
+        # Ensure that index is a DateTimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index must be a DateTimeIndex")
+
+        # Get US federal holidays
+        cal = USFederalHolidayCalendar()
+        holidays = cal.holidays(start=df.index.min(), end=df.index.max())
+
+        # Create a binary feature indicating whether the date is a US federal holiday
+        df["is_holiday"] = np.isin(df.index, holidays).astype(int)
 
         return df
 
@@ -86,15 +171,123 @@ class TimeSeriesFeaturizer:
         return best_lag
 
     @staticmethod
+    def stats_features(df: pd.DataFrame, col_name: str) -> pd.DataFrame:
+        """
+        Creates summary statistics features from a DataFrame with features.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame with features.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with features summarized.
+        """
+        # Ensure that index is a DateTimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index must be a DateTimeIndex")
+
+        # Ensure that df has at least 8 columns
+        if len(df.columns) <= 7:
+            return df
+
+        # Summarize features
+        df_stats = pd.DataFrame(index=df.index)
+        df_stats[f"{col_name}_mean"] = df.mean(axis=1)
+        df_stats[f"{col_name}_std"] = df.std(axis=1)
+        df_stats[f"{col_name}_min"] = df.min(axis=1)
+        df_stats[f"{col_name}_max"] = df.max(axis=1)
+        df_stats[f"{col_name}_median"] = df.median(axis=1)
+        df_stats[f"{col_name}_skew"] = df.skew(axis=1)
+        df_stats[f"{col_name}_kurtosis"] = df.kurtosis(axis=1)
+
+        return df_stats
+
+    @staticmethod
+    def create_ar_features(
+        series: pd.Series, lags: int, use_pacf: bool = False, max_lags: int = 3
+    ) -> pd.DataFrame:
+        """
+        Creates autoregressive features for a given time series.
+
+        Parameters
+        ----------
+        series : pd.Series
+            Time series data.
+        lags : int
+            Number of autoregressive features to add.
+        use_pacf : bool
+            If True, use PACF to find the best lag.
+        max_lags : int
+            Maximum number of lags possible.
+
+        Returns
+        -------
+        ar_features : pd.DataFrame
+            DataFrame containing the autoregressive features.
+        """
+        if use_pacf:
+            best_lag = TimeSeriesFeaturizer.find_best_lag_pacf(
+                series.dropna(), max_lags
+            )
+        else:
+            best_lag = lags
+
+        ar_features = pd.DataFrame(
+            {
+                f"{series.name}_lag_{i}": series.shift(i)
+                for i in range(best_lag)
+            }
+        )
+        ar_features.index = series.index
+
+        # Drop the newly created NaNs at the beginning, but retain existing NaNs in the original series
+        ar_features = ar_features.iloc[best_lag - 1 :]
+
+        # Create summary statistics features
+        ar_features = TimeSeriesFeaturizer.stats_features(
+            ar_features, str(series.name)
+        )
+
+        return ar_features
+
+    @staticmethod
+    def remove_zero_variability_features(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Removes features with zero variability from a DataFrame.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame with features.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with features with zero variability removed.
+        """
+        # Ensure that index is a DateTimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("Index must be a DateTimeIndex")
+
+        # Remove features with zero variability
+        df = df.loc[:, df.std() != 0]
+
+        return df
+
+    @staticmethod
     def create_features(
         df: pd.DataFrame,
-        target_variable: str,
-        ar_from_y: bool = True,
-        ar_from_weather_data: bool = False,
-        lags: int = 3,
-        max_lags: int = 3,
+        target_variable: str = TARGET_VARIABLE,
+        ar_from_y: bool = AR_FROM_Y,
+        ar_from_weather_data: bool = AR_FROM_WEATHER_DATA,
+        lags: int = LAGS,
+        max_lags: int = MAX_LAGS,
         use_pacf: bool = False,
-    ) -> Tuple[pd.DataFrame, Dict[str, int]]:
+        drop_na: bool = True,
+    ) -> pd.DataFrame:
         """
         Creates regression DataFrame from the given input y and weather data. Optionally add autoregressive features from y or weather data.
 
@@ -112,18 +305,16 @@ class TimeSeriesFeaturizer:
             Number of autoregressive features to add.
         max_lags : int
             Maximum number of lags possible; this is a function of step_length in the cross-validator.
+        use_pacf : bool
+            If True, use PACF to find the best lag.
+        drop_na : bool
+            If True, drop NaNs.
 
         Returns
         -------
         df : pd.DataFrame
             DataFrame ready for regression, with weather data and (if requested) autoregressive features.
         """
-        # Ensure lags is not greater than max_lags
-        if lags > max_lags:
-            raise ValueError(
-                f"lags cannot be greater than max_lags ({max_lags})"
-            )
-
         # Ensure that target_variable is in df
         if target_variable not in df.columns:
             raise ValueError(
@@ -137,41 +328,49 @@ class TimeSeriesFeaturizer:
         # Don't modify the original DataFrame
         df = df.copy()
 
+        y = df[target_variable]
+        weather_data = df.drop(columns=target_variable)
+
         # Create calendar features
         df = TimeSeriesFeaturizer.create_calendar_features(df)
 
-        best_lags = {}
-        # Create a dictionary to hold the new columns
-        new_columns = {}
-        # If autoregressive features from y are requested, add them
-        y = df[target_variable]
-        if ar_from_y:
-            if use_pacf:
-                best_lag_y = TimeSeriesFeaturizer.find_best_lag_pacf(
-                    y, max_lags
-                )
-                best_lags[target_variable] = best_lag_y
-            else:
-                best_lag_y = lags
+        # Create holiday features
+        df = TimeSeriesFeaturizer.create_holiday_features(df)
 
-            for i in range(best_lag_y):
-                new_columns[f"y_lag_{i+1}"] = y.shift(i)
+        # If autoregressive features from y are requested, add them
+        if ar_from_y:
+            y_ar_features = TimeSeriesFeaturizer.create_ar_features(
+                y, lags, use_pacf, max_lags
+            )
+            df, y_ar_features = TimeSeriesPreprocessor._align_timestamps(df, y_ar_features)  # type: ignore
+            df = pd.merge(
+                df,  # type: ignore
+                y_ar_features,  # type: ignore
+                left_index=True,
+                right_index=True,
+                how="inner",
+            )
 
         # If autoregressive features from weather_data are requested, add them
-        weather_data = df.drop(columns=target_variable)
-        if weather_data is not None and ar_from_weather_data:
+        if list(weather_data) and ar_from_weather_data:
             for column in weather_data.columns:
-                if use_pacf:
-                    best_lag_column = TimeSeriesFeaturizer.find_best_lag_pacf(
-                        df[column], max_lags
-                    )
-                    best_lags[column] = best_lag_column
-                else:
-                    best_lag_column = lags
-                for i in range(1, best_lag_column + 1):
-                    new_columns[f"{column}_lag_{i}"] = df[column].shift(i)
+                column_ar_features = TimeSeriesFeaturizer.create_ar_features(
+                    weather_data[column], lags, use_pacf, max_lags
+                )
+                df, column_ar_features = TimeSeriesPreprocessor._align_timestamps(df, column_ar_features)  # type: ignore
+                df = pd.merge(
+                    df,  # type: ignore
+                    column_ar_features,  # type: ignore
+                    left_index=True,
+                    right_index=True,
+                    how="inner",
+                )
 
-        # Concatenate the new columns to the original DataFrame
-        df = pd.concat([df, pd.DataFrame(new_columns)], axis=1)
+        # Remove features with zero variability
+        # df = TimeSeriesFeaturizer.remove_zero_variability_features(df)
 
-        return df.dropna(), best_lags
+        # Drop NaNs
+        if drop_na:
+            df.dropna(inplace=True)
+
+        return df

@@ -3,11 +3,8 @@ from typing import Tuple, Union
 import pandas as pd
 
 from common_constants import (
-    AR_FROM_WEATHER_DATA,
-    AR_FROM_Y,
     FORECAST_HORIZON,
-    LAGS,
-    MAX_LAGS,
+    TARGET_VARIABLE,
 )
 from time_series_featurizer import TimeSeriesFeaturizer
 
@@ -75,7 +72,7 @@ class TimeSeriesXy:
     @staticmethod
     def df_to_X_y(
         df: pd.DataFrame,
-        target_variable: str,
+        target_variable: str = TARGET_VARIABLE,
         fh: int = FORECAST_HORIZON,
         dropna: bool = True,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -101,15 +98,7 @@ class TimeSeriesXy:
             Series with the target variable.
         """
         # Create features
-        df, _ = TimeSeriesFeaturizer.create_features(
-            df,
-            target_variable,
-            ar_from_y=AR_FROM_Y,
-            ar_from_weather_data=AR_FROM_WEATHER_DATA,
-            lags=LAGS,
-            max_lags=MAX_LAGS,
-            use_pacf=False,  # for multi-step forecasting, use_pacf must be False
-        )
+        df = TimeSeriesFeaturizer.create_features(df, target_variable)
         # Create X
         X = df.drop(columns=target_variable)
         # Ensure that X is a DataFrame

@@ -56,7 +56,7 @@ OPTUNA_TRIALS = N_TRIALS = 100
 num_cores = mp.cpu_count()
 # Set the number of parallel jobs for HPO to 2/3 of the available cores
 OPTUNA_JOBS = N_JOBS = int(num_cores * 2 / 3)
-HPO_FLAG = True  # Flag to enable hyperparameter optimization
+HPO_FLAG = False  # Flag to enable hyperparameter optimization
 CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
 MODEL_NAME = "xgb"  # Model name. Must be one of: "rr", "xgb", "rf"
 METRIC_NAME = "mae"  # Metric name. Must be one of: "mae", "mse", "rmse", "rmsle", "mape", "smape", "r2", "corr"
@@ -98,6 +98,7 @@ MODEL_MAPPING = {
 MLFLOW_LOGGING_FLAG = (
     False  # Flag to enable logging of parameters and metrics to MLflow
 )
+SHAP_VALUES_FLAG = False  # Flag to enable calculation of SHAP values
 
 
 # For simulating production

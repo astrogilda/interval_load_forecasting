@@ -1,4 +1,5 @@
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import mlflow
@@ -26,6 +27,7 @@ from common_constants import (
     OBJECTIVE_METRICS,
     OPTUNA_JOBS,
     OPTUNA_TRIALS,
+    SHAP_VALUES_FLAG,
     STEP_LENGTH,
     TARGET_VARIABLE,
     VAL_LENGTH,
@@ -39,7 +41,12 @@ class TimeSeriesTrainer:
     Time series regression class.
     """
 
-    def _calculate_and_log_shap_values(self, model, X_train, run_id: str):
+    def __init__(self):
+        self.model = None
+
+    def _calculate_and_log_shap_values(
+        self, model, X_train, model_name: str, run_id: str = ""
+    ):
         """
         Log SHAP values as artifacts.
 
@@ -52,27 +59,42 @@ class TimeSeriesTrainer:
         run_id : str
             Unique identifier for the run.
         """
-        print(f"X_train shape: {X_train.shape}")
-        print(f"X_train.head():\n{X_train.head()}")
         # Calculate SHAP values
-        explainer = shap.Explainer(model, X_train)
-        shap_values = explainer(X_train)
-        print(f"shap_values.shape: {shap_values.shape}")
-
-        for step in range(
-            shap_values.shape[2]
-        ):  # Iterate over each forecast step
+        # explainer = shap.Explainer(model, X_train)
+        X_train_summary = shap.kmeans(X_train, 100)
+        explainer = shap.KernelExplainer(model.predict, X_train_summary)
+        shap_values = explainer.shap_values(X_train_summary.data)
+        # Iterate over each forecast step
+        for step in range(len(shap_values)):  # type: ignore
             # Isolate SHAP values for this step
-            shap_values_step = shap_values[:, :, step]
+            shap_values_step = shap_values[step]  # type: ignore
+
             # Log SHAP values as a plot for this step
-            shap_plot_path = f"shap_summary_step_{step}_{run_id}.png"
-            shap.summary_plot(shap_values_step, X_train, show=False)
-            plt.savefig(shap_plot_path)
-            # Save SHAP values as a DataFrame
-            shap_df_path = f"shap_summary_step_{step}_{run_id}.csv"
-            shap_df = pd.DataFrame(
-                shap_values_step.values, columns=X_train.columns
+            shap_plot_path = (
+                f"shap_summary_step_{step+1}_model_{model_name}_{run_id}.png"
+                if mlflow.active_run()
+                else f"shap_summary_step_{step+1}_model_{model_name}.png"
             )
+            shap_plot_path = str(Path("figures/results/shap") / shap_plot_path)
+            plt.close("all")
+            shap.summary_plot(
+                shap_values_step,
+                X_train_summary.data,
+                show=False,
+                feature_names=list(X_train),
+            )
+            plt.tight_layout()
+            plt.title(f"SHAP values for step {step+1}")
+            plt.savefig(shap_plot_path, dpi=300, bbox_inches="tight")
+
+            # Save SHAP values as a DataFrame
+            shap_df_path = (
+                f"shap_summary_step_{step+1}_model_{model_name}_{run_id}.csv"
+                if mlflow.active_run()
+                else f"shap_summary_step_{step+1}_model_{model_name}.csv"
+            )
+            shap_df_path = str(Path("results/shap") / shap_df_path)
+            shap_df = pd.DataFrame(shap_values_step, columns=X_train.columns)
             shap_df.to_csv(shap_df_path)
 
             if mlflow.active_run():
@@ -314,10 +336,20 @@ class TimeSeriesTrainer:
         model_class = MODEL_MAPPING[model_name]
         model = model_class(**best_params)
         X_train, y_train = TimeSeriesXy.df_to_X_y(df, target_variable)
-        model.fit(X_train.to_numpy(), y_train.to_numpy())
+
+        # Create the scaler
+        scaler = StandardScaler()
+        # Fit the scaler on the training data and transform both training and test data
+        X_train_scaled = scaler.fit_transform(X_train)
+        # Fit the model
+        model.fit(X_train_scaled, y_train.to_numpy())
+        self.model = model
 
         # Calculate and log SHAP values
-        self._calculate_and_log_shap_values(model, X_train, run_id)  # type: ignore
+        if SHAP_VALUES_FLAG:
+            self._calculate_and_log_shap_values(
+                model, X_train, model_name, run_id if mlflow.active_run() else ""  # type: ignore
+            )
 
         if mlflow.active_run():
             # Log model
@@ -325,4 +357,4 @@ class TimeSeriesTrainer:
             # End the run
             mlflow.end_run()
 
-        return model
+        return model, scaler
