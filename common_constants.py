@@ -58,7 +58,7 @@ num_cores = mp.cpu_count()
 OPTUNA_JOBS = N_JOBS = int(num_cores * 2 / 3)
 HPO_FLAG = False  # Flag to enable hyperparameter optimization
 CV_STRATEGY = "rolling"  # Cross-validation strategy. Must be one of: "rolling", "expanding"
-MODEL_NAME = "rf"  # Model name. Must be one of: "rr", "xgb", "rf"
+MODEL_NAME = "rr"  # Model name. Must be one of: "rr", "xgb", "rf"
 METRIC_NAME = "mae"  # Metric name. Must be one of: "mae", "mse", "rmse".
 
 # Define metrics for Optuna objective function
@@ -98,7 +98,7 @@ MODEL_MAPPING = {
 MLFLOW_LOGGING_FLAG = (
     True  # Flag to enable logging of parameters and metrics to MLflow
 )
-SHAP_VALUES_FLAG = True  # Flag to enable calculation of SHAP values
+SHAP_VALUES_FLAG = False  # Flag to enable calculation of SHAP values
 
 
 # For simulating production

@@ -21,7 +21,10 @@
   - [`time_series_trainer.py`](#time_series_trainer.py)
 - [Time Series Simulation and Error Analysis](#time-series-simulation-and-error-analysis)
   - [`time_series_simulator.py`](#time_series_simulator.py)
+- [Time Series Metrics Calculation](#time-series-metrics-calculation)
+  - [`time_series_metrics.py`](#time_series_metrics.py)
 - [Future Work](#future-work)
+
 # 24 Hour Load Forecasting
 
 This project focuses on using 15-minute load data for 24-hour load forecasting. It represents my efforts to align with software engineering best practices, following key principles where applicable. While it incorporates some essential practices, there is room for improvement and further refinement, providing an opportunity for collaboration and growth.
@@ -175,6 +178,17 @@ This simulation and error analysis approach provides insights into model perform
 - **Histogram of .05 Quantile Residuals**: `figures/residuals_histogram_p05quantile.png`
 - **Line Plot of Residuals Over Time**: `figures/residuals_lineplot.png`
 - **Heatmap of Mean Residuals by Hour and Day**: `figures/residuals_heatmap.png`
+
+## Time Series Metrics Calculation
+The `time_series_metrics.py` file introduces a systematic approach to evaluate and compare different forecasting models. By calculating key metrics such as Mean Absolute Error (MAE), Mean Absolute Percentage Error (MAPE), Root Mean Squared Error (RMSE), and Bias, this module provides quantitative insights into model performance. These metrics are instrumental in understanding the strengths and weaknesses of various models, allowing for informed decision-making and optimization.
+
+### `TimeSeriesMetrics` Class
+- **Constructor**: Initializes with the path of the CSV file containing the true values and a dictionary containing the names of models and paths of the CSV files containing the predicted values.
+- **`_read_file` Method**: Reads data from a CSV file and returns it as a NumPy array.
+- **`calculate_metrics` Method**: Calculates the MAE, MAPE, RMSE, and Bias for the given true and predicted values, returning a DataFrame containing the metrics.
+- **`create_and_save_metrics` Method**: Creates and saves the calculated metrics to a specified CSV file.
+
+This metrics calculation module facilitates a transparent and rigorous evaluation process, contributing to the project's goals of robustness, reproducibility, and collaboration. By encapsulating the metrics calculation within a dedicated class, the project maintains its modular design, ensuring flexibility and extensibility.
 
 ## Future Work
 
