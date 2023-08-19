@@ -4,7 +4,6 @@
 - [24 Hour Load Forecasting](#24-hour-load-forecasting)
   - [Overview](#overview)
   - [Modular Design](#modular-design)
-  - [Best Practices](#best-practices)
   - [Forecasting Methodology](#forecasting-methodology)
   - [Future Enhancements](#future-enhancements)
 - [Configuration Management](#configuration-management)
@@ -25,16 +24,13 @@
 - [Future Work](#future-work)
 # 24 Hour Load Forecasting
 
-This project focuses on using 15-minute load data for 24-hour load forecasting. The solution is modular, maintainable, and follows best practices in software development and data science.
+This project focuses on using 15-minute load data for 24-hour load forecasting. It represents my efforts to align with software engineering best practices, following key principles where applicable. While it incorporates some essential practices, there is room for improvement and further refinement, providing an opportunity for collaboration and growth.
 
 ## Overview
-24-hour load forecasting is a critical aspect of energy management, enabling accurate planning and optimization of energy resources. Utilizing 15-minute load data, this project employs state-of-the-art machine learning techniques and methodologies to predict energy consumption patterns 24 hours ahead.
+24-hour load forecasting is a critical aspect of energy management, enabling accurate planning and optimization of energy resources. Utilizing 15-minute load data, this project employs commonly used machine learning techniques and methodologies to predict energy consumption patterns 24 hours ahead.
 
 ## Modular Design
 The solution is structured into various modules, each responsible for specific tasks such as data loading, preprocessing, feature engineering, model training, simulation, and error analysis. This modular approach ensures flexibility, extensibility, and ease of maintenance.
-
-## Best Practices
-Incorporating best practices in both software development and data science, the project emphasizes code quality, reusability, scalability, and robustness. It includes proper configuration management, error handling, logging, testing, and documentation.
 
 ## Forecasting Methodology
 A variety of forecasting models are explored, including Random Forest, XGBoost, and Ridge Regression, along with hyperparameter tuning, cross-validation, and explainability techniques. The project also simulates a production environment to understand how the model performs with continuous data inflow.
@@ -42,12 +38,12 @@ A variety of forecasting models are explored, including Random Forest, XGBoost, 
 ## Future Enhancements
 With a roadmap for future improvements, the project considers aspects such as continuous training, cloud deployment, API development, enhanced testing, and comprehensive documentation to ensure production readiness.
 
-This project serves as a robust solution for 24-hour load forecasting, aligning with industry standards and addressing the multifaceted challenges of time series forecasting in the energy domain.
+This project serves as a robust foundation for 24-hour load forecasting, aligning with industry standards and addressing the multifaceted challenges of time series forecasting in the energy domain.
 
 --------------------------------------------------------------------------
 ## Configuration Management
 
-The configuration management in this project is handled through two primary files: `common_constants.py` and `time_constants.py`.
+The configuration management in this project is handled through two primary files: `common_constants.py` and `time_constants.py`. This approach is instrumental in avoiding magic numbers in the code, promoting clear understanding and maintainability. By centralizing these constants, the project facilitates rapid prototyping, allowing for efficient adjustments and scalability.
 
 ### `common_constants.py`
 This file contains essential configurations and constants used throughout the project, including importing necessary libraries and dependencies, defining constants related to data loading, and importing time-related constants from the `time_constants.py` file.
