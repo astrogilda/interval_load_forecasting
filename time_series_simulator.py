@@ -149,7 +149,7 @@ class TimeSeriesSimulator:
             )
 
             # Update i
-            i = i + test_length - (LAGS) + 1
+            i = i + test_length - (LAGS + FORECAST_HORIZON + 1)
 
             # Update iteration
             iteration += 1
@@ -302,8 +302,13 @@ class TimeSeriesSimulator:
             plt.ylabel("Predicted Load", fontsize=15)
             plt.legend()
             plt.title(f"Actual vs. Predicted {column}", fontsize=20)
+            savefilename = (
+                f"{folder}/actual_vs_predicted_{column}_scatterplot_model_{MODEL_NAME}_hpometric_{METRIC_NAME}.png"
+                if HPO_FLAG
+                else f"{folder}/actual_vs_predicted_{column}_scatterplot_model_{MODEL_NAME}.png"
+            )
             plt.savefig(
-                f"{folder}/actual_vs_predicted_{column}_scatterplot.png",
+                savefilename,
                 dpi=300,
                 bbox_inches="tight",
                 pad_inches=0.1,
@@ -316,8 +321,13 @@ class TimeSeriesSimulator:
         plt.xlabel("Residual", fontsize=15)
         plt.ylabel("Frequency", fontsize=15)
         plt.title("Histogram of Mean Residuals", fontsize=20)
+        savefilename = (
+            f"{folder}/residuals_histogram_mean_model_{MODEL_NAME}_hpometric_{METRIC_NAME}.png"
+            if HPO_FLAG
+            else f"{folder}/residuals_histogram_mean_model_{MODEL_NAME}.png"
+        )
         plt.savefig(
-            f"{folder}/residuals_histogram_mean.png",
+            savefilename,
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
@@ -330,8 +340,13 @@ class TimeSeriesSimulator:
         plt.xlabel("Residual", fontsize=15)
         plt.ylabel("Frequency", fontsize=15)
         plt.title("Histogram of max Residuals", fontsize=20)
+        savefilename = (
+            f"{folder}/residuals_histogram_p95quantile_model_{MODEL_NAME}_hpometric_{METRIC_NAME}.png"
+            if HPO_FLAG
+            else f"{folder}/residuals_histogram_p95quantile_model_{MODEL_NAME}.png"
+        )
         plt.savefig(
-            f"{folder}/residuals_histogram_p95quantile.png",
+            savefilename,
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
@@ -344,8 +359,13 @@ class TimeSeriesSimulator:
         plt.xlabel("Residual", fontsize=15)
         plt.ylabel("Frequency", fontsize=15)
         plt.title("Histogram of min Residuals", fontsize=20)
+        savefilename = (
+            f"{folder}/residuals_histogram_p05quantile_model_{MODEL_NAME}_hpometric_{METRIC_NAME}.png"
+            if HPO_FLAG
+            else f"{folder}/residuals_histogram_p05quantile_model_{MODEL_NAME}.png"
+        )
         plt.savefig(
-            f"{folder}/residuals_histogram_p05quantile.png",
+            savefilename,
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,
@@ -368,8 +388,13 @@ class TimeSeriesSimulator:
         plt.title("Mean Residuals by Hour and Day of Week", fontsize=20)
         plt.xlabel("Day of Week", fontsize=15)
         plt.ylabel("Hour of Day", fontsize=15)
+        savefilename = (
+            f"{folder}/residuals_heatmap_model_{MODEL_NAME}_hpometric_{METRIC_NAME}.png"
+            if HPO_FLAG
+            else f"{folder}/residuals_heatmap_model_{MODEL_NAME}.png"
+        )
         plt.savefig(
-            f"{folder}/residuals_heatmap.png",
+            savefilename,
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.1,

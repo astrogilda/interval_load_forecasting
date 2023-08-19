@@ -15,13 +15,6 @@ df = preprocessor.merge_y_and_weather_data(use_union=False)
 simulator = TimeSeriesSimulator(df)
 simulator.simulate_production()
 
-# Plot simulated production
-TimeSeriesSimulator.plot_simulation_results(
-    filename_actual="actual.csv",
-    filename_pred="predicted.csv",
-    folder="figures/results",
-)
-
 # Perform EDA
 # eda = TimeSeriesEDA
 # eda.perform_eda(y_data, target_variable="Load")  # type: ignore
