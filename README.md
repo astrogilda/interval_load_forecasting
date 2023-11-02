@@ -65,6 +65,7 @@ Exploratory Data Analysis (EDA) is an essential step in time series analysis tha
 - **Distribution Analysis**: Understand the statistical distribution of the data and identify potential transformations.
 - **Pattern Analysis**: Visualize specific patterns across different time frames (hourly, daily, monthly) to detect variations.
 - **Heatmap Analysis**: Visualize relationships across grouped variables through heatmaps, providing insights into complex dependencies.
+![Annual load heatmap](figures/eda/annual_load_heatmap.png)
 
 These analyses form the foundation for preprocessing, feature engineering, and model building, ensuring robust and accurate time series forecasting. The `time_series_eda.py` file contains methods for conducting exploratory data analysis (EDA) on time series data. Here's a detailed description of the main methods and their functionalities:
 
