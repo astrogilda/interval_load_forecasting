@@ -60,10 +60,14 @@ This file focuses on defining time-related constants, essential for time series 
 Exploratory Data Analysis (EDA) is an essential step in time series analysis that helps uncover underlying patterns, trends, and characteristics in the data. The methods provided in the `time_series_eda.py` file facilitate a comprehensive understanding of the time series data through various visualizations:
 
 - **Time Series Plotting**: Visualize the raw time series data to identify potential seasonality, trends, and outliers.
+![Interval Load](figures/eda/load_time_series.png)
 - **Seasonal Decomposition**: Decompose the time series into seasonal, trend, and residual components to understand underlying patterns.
+![Seasonal Decomposition](figures/eda/seasonal_decomposition.png)
 - **Autocorrelation Analysis**: Analyze the autocorrelations in the data, essential for model selection and tuning.
 - **Distribution Analysis**: Understand the statistical distribution of the data and identify potential transformations.
+![Distribution January](figures/eda/distribution_month_1.png)
 - **Pattern Analysis**: Visualize specific patterns across different time frames (hourly, daily, monthly) to detect variations.
+![Monthly load patterns](figures/eda/monthly_load_patterns.png)
 - **Heatmap Analysis**: Visualize relationships across grouped variables through heatmaps, providing insights into complex dependencies.
 ![Annual load heatmap](figures/eda/annual_load_heatmap.png)
 
