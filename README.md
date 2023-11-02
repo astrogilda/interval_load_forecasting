@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/681056609.svg)](https://zenodo.org/badge/latestdoi/681056609)
 
 ## Table of Contents
 
